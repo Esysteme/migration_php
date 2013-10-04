@@ -7,13 +7,18 @@ class Migration extends Controller
 {
 
     public $_path      = "/home/www/adel";
-    //public $_path      = "/home/www/old_php5_adel";
+//public $_path      = "/home/www/old_php5_adel";
     public $_blacklist = array("/GRAPH/");
 
     function __contruct()
     {
         
     }
+
+    /*
+     * 
+     * Remove all undesired matching design
+     */
 
     private function blacklist($filename)
     {
@@ -45,14 +50,21 @@ class Migration extends Controller
 
     function all()
     {
-        $this->replaceShortTag();
+        $this->replaceCtrlM(); // remove ^M and replace by \n
+        $this->replaceIdentification();  //replace Commun/IC_Identification.php
+        $this->replaceIcRequete();  //replace /include/IC_Requete.inc.php
+        $this->replaceShortTag(); // replace <? by <?php
 
-        for ($i = 0; $i < 4; $i++) {
-            $this->replaceConst();
-        }
-        $this->putConst();
-        $this->addConfigFile();
-        $this->addFullPath();
+        $this->replaceConst(); // replace $ggg[gg] by $ggg['gg']
+
+        $this->putConst(); // replace realconstante $ggg[gg] by  $ggg['gg']
+        $this->addConfigFile(); // add /include/IC_ENVIRONNEMENT.php
+        $this->addFullPath(); // repalce include file.php by include __DIR__."file.php"
+
+        $this->addTimeZoneToFfFF0PAG1(); // add default time zone
+        $this->addTimeZoneToFd0PAG1(); // add default time zone
+        //deprecated
+        //$this->addIC0PAG1P(); // add default time zone
     }
 
     function replaceShortTag()
@@ -69,11 +81,11 @@ class Migration extends Controller
             $data = file_get_contents($file);
 
             $count = 0;
-            $data  = preg_replace("/<\?(\s|\t|\n)/", "<?php\n", $data, -1, $count);
+            $data2 = preg_replace("#<\?(\s|\t|\n|/)#", "<?php\n", $data, -1, $count);
 
             echo (!empty($count)) ? $i . ':' . $count . ':' . $file . EOL : "";
 
-            file_put_contents($file, $data);
+            file_put_contents($file, $data2);
         }
     }
 
@@ -92,12 +104,14 @@ class Migration extends Controller
             if ($handle) {
                 $nbline = 1;
 
+                $out = array();
+
                 while (($buffer = fgets($handle)) !== false) {
                     preg_match_all('#\$[a-zA-Z_]{1}[a-zA-Z0-9_]*[\-\>[\w]+]?(\[([\[(.+)\]])*\])*\[([a-zA-Z_]{1}[a-zA-Z0-9_]*)\]#U', $buffer, $out, PREG_PATTERN_ORDER);
                     $nb_to_replace = count($out[0]);
 
                     for ($i = 0; $i < $nb_to_replace; $i++) {
-                        //echo "[".$out[2][$i]."] => ['".$out[2][$i]."']".PHP_EOL;
+//echo "[".$out[2][$i]."] => ['".$out[2][$i]."']".PHP_EOL;
                         $new    = str_replace("[" . $out[3][$i] . "]", "[\"" . $out[3][$i] . "\"]", $out[0][$i]);
                         $buffer = str_replace($out[0][$i], $new, $buffer);
                         echo $file_name . ":" . $nbline . " - " . $out[0][$i] . " => " . $new . PHP_EOL;
@@ -118,7 +132,7 @@ class Migration extends Controller
 
     function putConst()
     {
-        //fix specific for this file IC_Liste_HTML.inc.V8.3.CIE7.php
+//fix specific for this file IC_Liste_HTML.inc.V8.3.CIE7.php
 
         $file   = "/include/IC_Liste_HTML.inc.V8.3.CIE7.php";
         $consts = array("FIRMING_IN_VALUE", "KI", "KP");
@@ -143,7 +157,7 @@ class Migration extends Controller
 
         $requires = glob($dir . "*.{php,prn}", GLOB_BRACE);
 
-        //with "
+//with "
         foreach ($files as $file_name) {
 
             echo $file_name . EOL;
@@ -160,7 +174,7 @@ class Migration extends Controller
         }
 
 
-        //with '
+//with '
         foreach ($files as $file_name) {
 
             echo $file_name . EOL;
@@ -203,10 +217,9 @@ EOL;
         file_put_contents($file_name, $data);
     }
 
-    function addTnsnames(
-    )
+    private function addTnsnames()
     {
-        # TNSNAMES.ORA
+# TNSNAMES.ORA
 
         $data = <<< EOL
 ADELDEV =
@@ -1018,16 +1031,1302 @@ require_once('IC_Header.inc.php');
 // Inclure le HTML de l'entête de la page
 // -----------------------------------------------------------------------------
 require_once('IC_Footer.inc.php');
+
+        if (in_array(\$_SERVER['REMOTE_ADDR'], array("192.168.24.1", '192.168.168.1', '192.168.169.1'))) {
+            if (!empty(\$GLOBALS['tab_sql'])) {
+                \$i = 1;
+                echo '<table border ="1">';
+                foreach (\$GLOBALS['tab_sql'] as \$elem) {
+                    \$elem['file'] = str_replace('/mnt/hgfs/pc_www/', '', \$elem['file']);
+
+                    echo '<tr>';
+
+                    echo '<td>' . \$i . '</td>';
+                    echo '<td>' . \$elem['file'] . '</td>';
+                    echo '<td>' . \$elem['line'] . '</td>';
+                    echo '<td>' . \$elem['time'] . '</td>';
+                    echo '<td>' . \$elem['num_rows'] . '</td>';
+                    \$sql = \$elem['sql'];
+                    \$sql = preg_replace("#(/\*([^\*/]+)\*/)#i", "", \$sql); //retire les commentaires
+
+                    \$sql = preg_replace("/(CDIMPU)/i", "<b style=\"color:red\">\\$1</b>", \$sql);
+                    \$sql = preg_replace("/(CHAPUISA)/i", "<b style=\"color:black\">\\$1</b>", \$sql);
+                    \$sql = preg_replace("/(\sinner\s|\sGROUP\sBY\s|\sjoin\s|\sINTO\s|SELECT\s|\sFROM\s|\sWHERE\s|\sOR\s|\sORDER\sBY\s)/i", "<br/>&nbsp;&nbsp;&nbsp;&nbsp;<b style=\"color:#00F\">\\$1</b>", \$sql);
+                    \$sql = preg_replace("/(\sAND\s|\sOR\s)/i", "<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b style=\"color:#00F\">\\$1</b>", \$sql);
+
+
+                    \$sql = preg_replace("/(\sIN\s|\sON\s)/i", "<b style=\"color:#00F\">\\$1</b>", \$sql);
+                    \$sql = preg_replace("/(NULL)/i", "<b style=\"color:orange\">\\$1</b>", \$sql);
+
+                    \$sql = preg_replace("/(\sUNION\sALL\s|\sUNION\s)/i", "<br/><b style=\"color:#00F\">\\$1</b>", \$sql);
+                    \$sql = preg_replace("/(\s=\s|\s!=\s|\s\+\s|\s\-\s)/i", "<b style=\"color:#000\">\\$1</b>", \$sql);
+
+
+                    echo '<td>' . \$sql . '</td></tr>';
+
+                    \$i++;
+                }
+                echo '</table>';
+            }
+        }
+
 ?>
+EOL;
+
+
+        $this->view        = false;
+        $this->layout_name = false;
+        $file_name         = $this->_path . "/Commun/IC_Identification.php";
+
+        file_put_contents($file_name, $data);
+    }
+
+    function replaceIcRequete()
+    {
+        $data = <<< EOL
+<?php
+
+// MAINTENANCES :
+//
+// VERSION   DATE       AUTEUR  OBJET
+//  V2         10/06/2010  SM   Mpi-?.xls
+//             8/08/2011 Ajout libÃ©ration des ressources + limiter le rÃ©sultat oracle + fermeture session
+//             16/08/2011  Supprimer dans la requete passÃ©e Ã  oracle : les espaces inutiles, tabulations, retour chariot, nouvelle ligne ...
+// V8.1.6      17/10/2012 CTR Mpi 2146 : Ajout d'un bouton permettant au KU de dÃ©bloquer une personne.(INC000002676530)
+//
+/**
+ *  MAINTENANCE 1 :
+ *  **************************************** 
+ *  @Date : Le 05/04/2012
+ *  @Author : Nawal MALKHAOUI
+ *  @CT : 347 MPI 2037
+ *  @Desc : Historiser les requete de type Procedure dans la table IC_LOGA0.
+ *     NB:le champ "historyRequestToIcLogA0" ne doit pas Ãªtre utilisÃ© dans param,
+ *            (le 3Ã¨me parametre de requete ne doit par contenir "historyRequestToIcLogA0"  ) 
+ *  
+ *  */
+include_once ("IC_ENVIRONNEMENT.php");
+define( 'MAX_ROWS', 30000 );
+define( 'RESULTAT_ORACLE_INCOMPLET', 'INCOMPLET' );
+
+class requete
+{
+
+	//	var \$IdCon;
+	var \$NumReq;
+	var \$SqlDem;
+	var \$SqlExec;
+	var \$TypeSql;
+	var \$Base_Appelee;   // Contiendra 'DWH' pour DWH transport 'ADEL' pour Adel
+	var \$Mode_Sql;   // Contiendra 'Oracle', 'AdabasD' pour SQL adabas a traduire
+	var \$Retour_T;
+	var \$IdRes;
+	var \$Sortie_T;
+	var \$Position;
+	var \$NbLigne;
+	var \$MAX_ROWS;
+	var \$SKIP_ROWS;
+	var \$Result;
+
+	// -----------------------------------------------------------------------------
+	// OBJET METHODE : Constructeur de la class RequeteORCL
+	// -------------
+	// Prototype :
+	// RequeteORCL( String Sql, String type, Array &\$param)
+	//
+    // Parametres  en entree :
+	//              - Obligatoires :
+	//                               - ChaÃ®ne SQL
+	//                               - Type de requete dÃ©crit par la chaÃ®ne SQL
+	//                               - Tableau de description des paramÃ¨tres d'entrÃ©e
+	//             - Facultatifs   :
+	//                               - Mode_Sql : langage SQL (AdabasD ou Oracle)
+	//                               - base : Adel ou DWH
+	//                               - MAX_ROWS : le nombre de lignes maximal a lire, a partir de la skip-ieme.
+	//                                 S'il prend la valeur de -1, cela signifie que toutes les lignes seront lues. 
+	//                                 Par defaut ce parametre prend la valeur definie dans la constante MAX_ROWS.
+	//                               - SKIP_ROWS : skip est le nombre de lignes initiales a ignorer lors de la lecture
+	//                                  du resultat.
+	//                                  Par defaut, ce parametre prend la valeur 0, pour commencer la lecture a 
+	//                                  la premiere ligne
+	//              
+	//  ATTENTION !!!!! QUAND MAX_ROWS N EST PAS PRECISE, LE NOMBRE DE LIGNES LUES SERA LIMITE A 30 000 Lignes !!!!!
+	//                   EN REVANCHE, QUANQ MAX_ROWS EST PRECISE LE NOMBRE DE LIGNES LUES NE SERA PAS LIMITE.
+	//                  
+	// Exemples d'appel de la fonction :
+	//   
+	// RequeteORCL("SELECT * FROM aTABLE WHERE CDRUB=::cdrub01 AND CDTOTO='toto'",'S',\$tab);
+	// RequeteORCL("PROCSTOCKEE(::cdrub01, 'toto', ::cdrub03)", 'P',\$tab)
+	// RequeteORCL("SIGNATURE(::cduser, ::cdpsw)", 'A',\$tab)
+	//-----------------------------------------------------------------------------	
+	function requete( \$Sql, \$type, &\$param, \$Mode_Sql = 'AdabasD', \$base = 'ADEL', \$MAX_ROWS = "", \$SKIP_ROWS = "" )
+	{
+		if ( \$Mode_Sql == "" )
+		{
+			\$Mode_Sql	 = \$GLOBALS['IC_LANGAGE_SQL'];
+			if ( \$Mode_Sql == "" )
+				\$Mode_Sql	 = 'ORACLE';
+			switch ( \$Mode_Sql ):
+				case "ORACLE":
+					\$Mode_Sql	 = "Oracle";
+					break;
+				case 'ADABASD':
+					\$Mode_Sql	 = "AdabasD";
+					break;
+				default:
+					\$Mode_Sql	 = "Oracle";
+			endswitch;
+		}
+		if ( \$base == "" )
+			\$base = "ADEL";
+
+		\$this->MAX_ROWS	 = "";
+		if ( is_integer( \$MAX_ROWS ) )
+			\$this->MAX_ROWS	 = \$MAX_ROWS;
+		//
+		\$this->SKIP_ROWS = 0;
+		if ( is_integer( \$SKIP_ROWS ) )
+			\$this->SKIP_ROWS = \$SKIP_ROWS;
+
+		\$this->setMaxRowsOCI();
+		\$this->TypeSql		 = \$type;
+		\$this->Base_Appelee	 = \$base;
+		//
+		\$Retour_T			 = array("Num_Mess"	 => " ", "Lib_Mess"	 => " ", "Type"		 => " ");
+		\$numargs			 = func_num_args();
+		if ( \$numargs < 3 )
+		{
+			\$this->RemplissageRetour( 9997, "Pas Assez d'argument pour construire La Requete", "EP" );
+			return false;
+		}
+		if ( !preg_match( "/[A|S|P]/", \$type ) ) /* Sera Ã  rajouter lorsque les fcts seront prÃªtes */
+		//if (! ereg("[S|P]",\$type))
+		{
+			\$this->RemplissageRetour( 9996, "Type Sql non Connu", "EP" );
+			return false;
+		}
+		if ( !preg_match( "/[ADEL|DWH]/", \$base ) )
+		{
+			\$this->RemplissageRetour( 9989, "Base inconnue", "EP" );
+			return false;
+		}
+		if ( !preg_match( "/[AdabasD|Oracle]/", \$Mode_Sql ) )
+		{
+			\$this->RemplissageRetour( 9988, "Mode Sql inconnue", "EP" );
+			return false;
+		}
+		if ( !is_array( \$param ) )
+		{
+			\$this->RemplissageRetour( 9995, "Parametre non dans un Tableau", "EP" );
+			return false;
+		}
+		// Parametres OK
+		if ( empty( \$_SESSION["NumeroRequete"] ) )
+		{
+			\$_SESSION["NumeroRequete"] = 0;
+		}
+
+		\$this->NumReq	 = ++\$_SESSION["NumeroRequete"];
+		\$this->SqlDem	 = \$Sql;
+		\$this->Mode_Sql	 = \$Mode_Sql;
+		\$this->Sortie_T	 = &\$param;
+		\$this->Position	 = 0;
+		\$this->Result	 = array();
+		//
+		\$this->PrepareRequete();
+		//
+		\$this->ExecuteRequete();
+		// echo '<pre>';print_r(\$_SESSION);
+		//NMA = MAINTENANCE 1 :  lancer la sauvgarde de la requete demandÃ©e
+
+
+		if ( empty( \$this->Sortie_T['CDMESSAGE'] ) )
+		{
+			\$this->Sortie_T['CDMESSAGE']['Valeur'] = 0;
+		}
+
+		if ( \$this->Sortie_T['CDMESSAGE']['Valeur'] == 0 && \$this->TypeSql == 'P' && (!isset( \$param['historyRequestToIcLogA0']['Valeur'] ) || \$param['historyRequestToIcLogA0']['Valeur'] == false) && isset( \$_SESSION['APPLIS']['FF']['CDPROF'] ) && \$_SESSION['APPLIS']['FF']['CDPROF'] == 'A0' )
+		{
+			saveHistory( addslashes( \$this->SqlExec ) );
+		}
+	}
+
+	// ----------------------------------------------------------------------------
+	// OBJET FONCTION : Postionne le nombre de lignes Ã  retourner
+	// --------------   par les requetes ORACLE
+	//         - MAX_ROWS : le nombre de lignes maximal a lire (donnÃ© en paramÃ¨tre de l'objet requete) par les requetes ORACLE, a partir de la skip-ieme.
+	//                      S'il prend la valeur de -1, cela signifie que toutes les lignes seront lues. 
+	//                      Par dÃ©faut ce paramÃ¨tre est null
+	//         - SKIP_ROWS : skip est le nombre de lignes initiales a ignorer lors de la lecture
+	//                       du resultat.
+	//                       Par defaut, ce parametre prend la valeur 0, pour commencer la lecture a 
+	//                       la premiere ligne
+	//         - MAX_ROWS_OCI : Nombre de lignes Ã  retourner par l'instruction OCI_FETCH_ALL.
+	//                          Quand MAX_ROWS est null alors MAX_ROWS_OCI est limitÃ© pour des raisons 
+	//                              de performances Ã   30 000 + 1 
+	//                          (+1 afin de pouvoir afficher une erreur quand le rÃ©sultat est incomplet)
+	//                          Quand MAX_ROWS > 0 alors MAX_ROWS_OCI = MAX_ROWS
+	//                          Quand MAX_ROWS < 0 alors MAX_ROWS_OCI = MAX_ROWS
+	// Exemples d'appel de la fonction :
+	// \$this->RemplissageRetour('001','Le paramÃ¨tre aParam_T n'est pas un tableau.','EP');
+	//-----------------------------------------------------------------------------
+	function setMaxRowsOCI()
+	{
+
+		\$this->MAX_ROWS_OCI	 = \$this->MAX_ROWS;
+		if ( \$this->MAX_ROWS_OCI == "" )
+			\$this->MAX_ROWS_OCI	 = MAX_ROWS; // Permet de limiter le nombre
+
+
+
+
+			
+// de lignes retournÃ©es par ORACLE
+	}
+
+	// ----------------------------------------------------------------------------
+	// OBJET FONCTION : Permet de mettre Ã  jour le tableau du retour des erreurs ou informations
+	// --------------
+	// Prototype :
+	// RemplissageRetour( String NumMess, String LibMess, String Type)
+	//
+    // ParamÃ¨tres  en entrÃ©e :
+	//              - Obligatoires :
+	//                               - NumÃ©ro de l'erreur
+	//                               - LibellÃ© de l'erreur
+	//                               - Type de l'erreur
+	//
+    // Exemples d'appel de la fonction :
+	// \$this->RemplissageRetour('001','Le paramÃ¨tre aParam_T n'est pas un tableau.','EP');
+	//-----------------------------------------------------------------------------
+	function RemplissageRetour( \$NumMess, \$LibMess, \$Type, \$ForceDisplayError = "" )
+	{
+		\$numargs = func_num_args();
+		if ( \$numargs < 3 )
+		{
+			\$this->Retour_T['Num_Mess']	 = 9994;
+			\$this->Retour_T['Lib_Mess']	 = "Pas assez d'arguments Retour_T";
+			\$this->Retour_T['Typ_Mess']	 = "EP";
+		}
+		\$this->Retour_T['Num_Mess']	 = \$NumMess;
+		\$this->Retour_T['Lib_Mess']	 = \$LibMess;
+		\$this->Retour_T['Typ_Mess']	 = \$Type;
+		if ( trim( \$ForceDisplayError ) != "" )
+		{
+			\$GLOBALS["MESSAGE"]["NumMess"]			 = \$Req1->Retour_T["Num_Mess"];
+			\$GLOBALS["TRANSACTION"]["ErreurLecture"] = true;
+			//  if ( \$this->Retour_T[Typ_Mess] == "EP" )
+			\$GLOBALS["MESSAGE"]["Type"]				 = "P";
+		}
+	}
+
+	// ----------------------------------------------------------------------------
+	// OBJET FONCTION : Permet de remplacer dans la requÃªte demandÃ© les variables 
+	// --------------  de la forme "::<nom variable>" par leur valeur issue du tableau \$Param_T
+	// Prototype :
+	// PrepareRequete()
+	//
+    // ParamÃ¨tres en sortie :
+	//              
+	//
+    // Exemples d'appel de la fonction :
+	// \$this->PrepareRequete();
+	//-----------------------------------------------------------------------------
+	function PrepareRequete()
+	{
+		//        global \$_SESSION;
+		\$temp			 = \$this->SqlDem;
+		\$V_Sortie_T		 = \$this->Sortie_T;
+		krsort( \$V_Sortie_T, SORT_STRING );
+		\$Tmp_session_id	 = session_id();
+		if ( trim( \$Tmp_session_id ) == "" )
+			\$Tmp_session_id	 = \$_SERVER["REMOTE_ADDR"] . \$_SERVER["REMOTE_PORT"];
+		//
+		//      Traduction de la requete en Oracle si Mode_Sql = 'AdabasD'
+		//            
+		if ( \$this->Mode_Sql == 'AdabasD' )
+		{
+			if ( \$this->TypeSql == 'S' )
+				\$temp = TrancodificationRequeteADABASD( \$temp );
+		}
+		//
+		//      Fin de la Transco
+		//
+        
+        // JC 16/8/2011 : supprimer les caractÃ¨res inutiles dans la requete
+		\$patterns[0] = "/\s+/";
+		\$patterns[1] = "/\t+/";
+		\$patterns[2] = "/\n+/";
+		\$patterns[3] = "/\r+/";
+
+		\$replacements[0] = " ";
+		\$replacements[1] = "";
+		\$replacements[2] = "";
+		\$replacements[3] = "";
+
+
+		if ( empty( \$_SESSION["CDUSER"] ) )
+		{
+			\$_SESSION["CDUSER"] = "";
+		}
+
+
+		\$temp = preg_replace( \$patterns, \$replacements, \$temp );
+
+		\$temp	 = str_replace( "::CDSESSION", \$Tmp_session_id, \$temp );
+		\$temp	 = str_replace( "::IDREQUETE", \$this->NumReq, \$temp );
+		\$temp	 = str_replace( "::CDUTIL", \$_SESSION["CDUSER"], \$temp );
+		foreach ( \$V_Sortie_T as \$key => \$value )
+		{
+			if ( \$this->TypeSql == 'S' )
+				\$V_Sortie_T[\$key]['Valeur'] = TrancodificationValeurADABASD( \$key, \$V_Sortie_T[\$key]['Valeur'] );
+			if ( \$V_Sortie_T[\$key]['Recherchee'] )
+			{
+				\$temp = str_replace( "::\$key", \$V_Sortie_T[\$key]['Valeur'], \$temp );
+			}
+		}
+		\$this->SqlExec = \$temp;
+	}
+
+	// ----------------------------------------------------------------------------
+	// OBJET FONCTION : ExÃ©cute la requete SQL et crÃ©e un rÃ©sultat
+	// --------------
+	// Prototype :
+	// ExecuteRequete()
+	//
+    // ParamÃ¨tres en sortie :
+	// 
+	//
+    // Exemples d'appel de la fonction :
+	// \$this->ExecuteRequete();
+	//-----------------------------------------------------------------------------
+	function ExecuteRequete()
+	{
+
+
+		if ( empty( \$GLOBALS[\$this->Base_Appelee]["ID_CON"] ) )
+		{
+			\$GLOBALS[\$this->Base_Appelee]["ID_CON"] = "";
+		}
+
+
+		if ( !IsConnectId( \$GLOBALS[\$this->Base_Appelee]["ID_CON"] ) )
+		{
+			ConnectBase( \$GLOBALS[\$this->Base_Appelee]["ID_CON"], \$this->Base_Appelee );
+			//  echo "<br> ***".\$GLOBALS[\$this->Base_Appelee]["ID_CON"];
+			// A supprimer
+			//       if (! IsConnectId(\$GLOBALS[\$this->Base_Appelee]["ID_CON"]))
+			//          echo "<br> **** Non Connecte";
+			// FIN A supprimer
+		}
+		if ( \$this->TypeSql == "S" )
+		{
+			//echo \$this->SqlExec;
+			
+			\$this->IdRes = ociparse( \$GLOBALS[\$this->Base_Appelee]["ID_CON"], \$this->SqlExec );
+			if ( !IsResultId( \$this->IdRes ) )
+			{
+				\$this->RemplissageRetour( 9990, "La Requete a echouee", "EP" );
+				return false;
+			}
+			\$ok = ociexecute( \$this->IdRes );
+			if ( !\$ok )
+			{
+				\$this->RemplissageRetour( 9990, "La Requete a echouee", "EP" );
+				return false;
+			}
+			\$res			 = array();
+			//  
+			\$MAX_ROWS_OCI	 = \$this->MAX_ROWS_OCI;
+			if ( \$this->MAX_ROWS == "" )
+				\$MAX_ROWS_OCI += 1;
+
+			\$SKIP = \$this->SKIP_ROWS;
+
+			\$this->NbLigne	 = ocifetchstatement( \$this->IdRes, \$res, \$SKIP, \$MAX_ROWS_OCI, OCI_FETCHSTATEMENT_BY_ROW );
+			\$cr				 = ocifreestatement( \$this->IdRes );
+
+			if ( \$this->NbLigne > 0 )
+			{
+				if ( \$MAX_ROWS_OCI > 0 && \$this->NbLigne > \$this->MAX_ROWS_OCI && \$this->MAX_ROWS == "" )
+				{
+					\$this->RemplissageRetour( 9990, RESULTAT_ORACLE_INCOMPLET, 'EP', "OUI" );
+				}
+				reset( \$res );
+				if ( \$this->MAX_ROWS == "" && \$this->NbLigne > \$this->MAX_ROWS_OCI )
+					\$this->NbLigne -= 1;
+			}
+
+			\$this->Result = \$res;
+		}
+		else
+		{
+
+			\$Tmp_session_id = session_id();
+			if ( trim( \$Tmp_session_id ) == "" )
+			{
+				\$Tmp_session_id = \$_SERVER["REMOTE_ADDR"] . \$_SERVER["REMOTE_PORT"];
+			}
+			if ( \$this->Mode_Sql != 'Oracle' )
+			{
+				// --------------------------------------------------------------------------
+				// Remplacer tous les '{CALL ' par begin
+				// --------------------------------------------------------------------------
+				\$Fonction_debut			 = '{[Cc][Aa][Ll][Ll] ';
+				\$Fonction_debut_Oracle	 = 'begin ';
+				\$this->SqlExec			 = eregi_replace( \$Fonction_debut, \$Fonction_debut_Oracle, \$this->SqlExec );
+				\$Fonction_debut2		 = '}';
+				\$Fonction_debut2_Oracle	 = '; end;';
+				\$this->SqlExec			 = eregi_replace( \$Fonction_debut2, \$Fonction_debut2_Oracle, \$this->SqlExec );
+				\$pos_nom				 = strpos( \$this->SqlExec, 'DBASIF' );
+				\$pos_parenthese			 = strpos( \$this->SqlExec, '(' );
+				\$Tmp_call				 = substr( \$this->SqlExec, 0, \$pos_nom )
+						. substr( \$this->SqlExec, \$pos_nom + 7, \$pos_parenthese - \$pos_nom - 7 )
+						. '.' . substr( \$this->SqlExec, \$pos_nom + 7, \$pos_parenthese - \$pos_nom - 7 )
+						. substr( \$this->SqlExec, \$pos_parenthese );
+				\$this->SqlExec			 = \$Tmp_call;
+			}
+			\$ID_Res_DBP = ociparse( \$GLOBALS[\$this->Base_Appelee]["ID_CON"], \$this->SqlExec );
+			if ( !IsResultId( \$ID_Res_DBP ) )
+			{
+				\$this->RemplissageRetour( 9990, "La Requete a echouee", "EP" );
+				return false;
+			}
+			\$ok = ociexecute( \$ID_Res_DBP );
+			if ( !\$ok )
+			{
+				\$this->RemplissageRetour( 9990, "La Requete a echouee", "EP" );
+				return false;
+			}
+			\$req_res	 = "SELECT CDMESSAGE,LISORTIE FROM IC_MER WHERE CDSESSION = '"
+					. \$Tmp_session_id
+					. "' AND IDREQUETE ="
+					. \$this->NumReq;
+			\$this->IdRes = ociparse( \$GLOBALS[\$this->Base_Appelee]["ID_CON"], \$req_res );
+			if ( !IsResultId( \$this->IdRes ) )
+			{
+				\$this->RemplissageRetour( 9990, "La Requete a echouee", "EP" );
+				return false;
+			}
+			\$ok = ociexecute( \$this->IdRes );
+			if ( !\$ok )
+			{
+				\$this->RemplissageRetour( 9990, "La Requete a echouee", "EP" );
+				return false;
+			}
+			\$res = array();
+
+			\$this->NbLigne	 = ocifetchstatement( \$this->IdRes, \$res, 0, -1, OCI_FETCHSTATEMENT_BY_ROW );
+			\$this->Result	 = \$res;
+			\$this->LectureSuivant( \$this->Sortie_T );
+			\$cr				 = ocifreestatement( \$this->IdRes );
+			//print_r(\$this->Sortie_T);
+		}
+	}
+
+	// -----------------------------------------------------------------------------
+	// Methode  APlusResultat
+	// -----------------------------------------------------------------------------
+	// OBJET METHODE : Verifie que la requete a au moins 1 ligne de rÃ©sultat de plus
+	// --------------
+	// Prototype :
+	// bool APlusResultat()
+	//
+    // ParamÃ¨tres  en entrÃ©e :
+	//              - Obligatoires :
+	//
+    //              - Facultatifs  :
+	//
+    // ParamÃ¨tres en sortie :
+	//
+    //
+    // Exemples d'appel de la mÃ©thode :
+	// \$MaRequete->APlusResultat();
+	//------------------------------------------------------------------------------
+	function APlusResultat()
+	{
+		/*  if ( ! IsConnectId(\$this->IdCon) )
+		  {
+		  \$this->RemplissageRetour(9991," Pas de Connexion ","ODBC");
+		  return false;
+		  }
+		  if ( ! IsResultId(\$this->IdRes))
+		  {
+		  \$this->RemplissageRetour(9992," RÃ©sultat non valide ","ODBC");
+		  return false;
+		  }
+		 */
+		if ( \$this->Position < \$this->NbLigne )
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	// -----------------------------------------------------------------------------
+	// MÃ©thode  LectureSuivant
+	// -----------------------------------------------------------------------------
+	// OBJET METHODE : Lit le rÃ©sultat suivant et deplace le curseur
+	// --------------
+	// Prototype :
+	// bool LectureSuivant(Tableau) /* prend un tableau en parametre
+	//
+    // ParamÃ¨tres  en entrÃ©e :
+	//              - Obligatoires :
+	//                               - Tableau dans lequel seront placÃ© les rÃ©sultats
+	//              - Facultatifs  :
+	//
+    // ParamÃ¨tres en sortie :
+	//
+    //
+    // Exemples d'appel de la mÃ©thode :
+	// \$MaRequete->LectureSuivant(MonTableau);
+	//------------------------------------------------------------------------------
+	function LectureSuivant( &\$TableauSortie )
+	{
+		\$NumArgs = func_num_args();
+		if ( \$NumArgs == 0 || !is_array( \$TableauSortie ) )
+		{
+			\$this->RemplissageRetour( 9993, " Pas de Tableau de sortie ", "EP" );
+			return false;
+		}
+		if ( !\$this->APlusResultat() )
+		{
+			if ( \$this->Retour_T['Num_Mess'] == 0 )
+			{
+				\$this->RemplissageRetour( 9108, " Fin de Liste ", "INFO" );
+			}
+			return false;
+		}
+		/*   if ( ! IsConnectId(\$this->IdCon) )
+		  {
+		  \$this->RemplissageRetour(9991," Pas de Connexion ","ODBC");
+		  return false;
+		  } */
+		foreach ( \$this->Result[\$this->Position] as \$col => \$val )
+		{
+			if ( \$col == "LISORTIE" && \$val != "" )
+			{
+				parse_str( \$val );
+				foreach ( \$elt_name as \$indice => \$valeur )
+				{
+					\$TableauSortie[\$elt_name[\$indice]]['Valeur']	 = \$elt_val[\$indice];
+					\$TableauSortie[\$elt_name[\$indice]]['Affichee']	 = htmlentities( \$elt_val[\$indice], ENT_COMPAT );
+				}
+			}
+			else
+			{
+				\$TableauSortie[\$col]['Valeur']	 = \$val;
+				\$TableauSortie[\$col]['Affichee'] = htmlentities( \$val, ENT_COMPAT );
+			}
+		}
+		++\$this->Position;
+		return true;
+	}
+
+
+	// -----------------------------------------------------------------------------
+	// MÃ©thode  LibereResultat
+	// -----------------------------------------------------------------------------
+	// OBJET METHODE : Libere le curseur de rÃ©sultat dans la base
+	// --------------
+	// Prototype :
+	// bool LibereResultat()
+	//
+    // ParamÃ¨tres  en entrÃ©e :
+	//              - Obligatoires :
+	//
+    //              - Facultatifs  :
+	//
+    // ParamÃ¨tres en sortie :
+	//
+    //
+    // Exemples d'appel de la mÃ©thode :
+	// Resultat->LibereResultat();
+	//------------------------------------------------------------------------------
+	function LibereResultat()
+	{
+		if ( !IsResultId( \$this->IdRes ) )
+		{
+			\$this->RemplissageRetour( 9992, " RÃ©sultat non valide ", "ODBC" );
+			return false;
+		}
+		if ( !IsConnectId( \$GLOBALS[\$this->Base_Appelee]["ID_CON"] ) )
+		{
+			\$this->RemplissageRetour( 9991, " Pas de Connexion ", "ODBC" );
+			return false;
+		}
+		ocifreestatement( \$this->IdRes );
+		\$this->IdRes = false;
+		return true;
+	}
+
+	//
+	// ---------------------------------------------------------------------------
+}
+
+// fin class
+//
+//
+// Fonctions GÃ©nÃ©rales
+// -----------------------------------------------------------------------------
+// Fonction  IsResultId
+// -----------------------------------------------------------------------------
+// OBJET FONCTION : VÃ©rifie que l'argument est un Identifiant de rÃ©sultat ODBC
+// --------------
+// Prototype :
+// bool IsResultId(\$IdRes)
+//
+// ParamÃ¨tres  en entrÃ©e :
+//              - Obligatoires :
+//                      - \$IdResult
+//              - Facultatifs  :
+//
+// ParamÃ¨tres en sortie :
+//
+//
+// Exemples d'appel de la mÃ©thode :
+// IsResultId(\$MonResult);
+//------------------------------------------------------------------------------
+
+function IsResultId( \$IdResult )
+{
+	\$numargs = func_num_args();
+	if ( \$numargs < 1 )
+		return false;
+	if ( !Is_Resource( \$IdResult ) || !"oci8 statement" == get_resource_type( \$IdResult ) )
+		return false;
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// Fonction  IsConnectId
+// -----------------------------------------------------------------------------
+// OBJET FONCTION : VÃ©rifie que l'argument est un Identifiant de connexion ODBC
+// --------------
+// Prototype :
+// bool IsConnectId(\$IdConnexion)
+//
+// ParamÃ¨tres  en entrÃ©e :
+//              - Obligatoires :
+//                      - \$IdConnexion
+//              - Facultatifs  :
+//
+// ParamÃ¨tres en sortie :
+//
+//
+// Exemples d'appel de la mÃ©thode :
+// IsConnectId(\$MaConnexion);
+//------------------------------------------------------------------------------
+function IsConnectId( \$IdConnexion )
+{
+	\$numargs = func_num_args();
+	if ( \$numargs < 1 )
+		return false;
+
+	if ( !Is_Resource( \$IdConnexion ) )
+	{
+		return false;
+	}
+	if ( !"OCI8 CONNECTION" == strtoupper( get_resource_type( \$IdConnexion ) ) )
+		return false;
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// Fonction ConnectBase
+// -----------------------------------------------------------------------------
+// OBJET FONCTION : crÃ©e une connection ou RecupÃ¨re l'ID de la connection active.
+// --------------
+// Prototype :
+// bool ConnectBase(\$IdConnect)
+//
+// ParamÃ¨tres  en entrÃ©e :
+//              - Obligatoires :
+//                      - \$IdConnect : rÃ©fÃ©rence sur identifiant de connection.
+//              - Facultatifs  :
+//
+//
+// ParamÃ¨tres en sortie :
+//
+//
+// Exemples d'appel de la mÃ©thode :
+// ConnectBase(\$MaConnexionID);
+//------------------------------------------------------------------------------
+function ConnectBase( &\$IdConnect, \$base )
+{
+	\$numargs = func_num_args();
+	if ( \$numargs < 2 )
+		return false;  // aucun paramÃ¨tre.
+// debut traitement
+
+
+
+	if ( \$base == 'DWH' )
+	{
+		\$MaCon = ocinlogon( "BOSIF", "BOSIF", "BOTISPRD.WORLD" );
+	}
+	if ( \$base == 'ADEL' )
+	{
+
+		//putenv("TNS_ADMIN=/usr/local/Zend/Core/network/admin/");
+		//print_r(\$GLOBALS['IC_TNSNAME']);
+		//ADELDEV <= GLOBALS['IC_TNSNAME']
+
+		\$MaCon = ocinlogon( "PHP", "JGMWEB", "(DESCRIPTION =
+    (ADDRESS_LIST =
+      (ADDRESS = (PROTOCOL = TCP)(Host = sbcch10199.ad.sys)(Port = 1523))
+    )
+    (CONNECT_DATA =
+      (SID = ADELDEV)
+    )
+  )" ) or die( "pb connection" );
+//           \$MaCon = ocinlogon("DBASIF","DBASIF","ADELPROD");
+		/*          if (! \$MaCon = @ocinlogon("DBASIF","DBASIF","ADELPROD")) {
+		  \$error = ocierror();
+		  print_r(\$error);
+		  echo "There was an error connecting. Error was: ".\$error["message"];
+		  phpinfo();
+		  die();
+		  } */
+
+//            \$MaCon = ocinlogon("DBASIF","DBASIF","ADELDEV");  
+//            \$MaCon = ocinlogon("DBASIF","DBASIF","ADEL");
+//           \$MaCon = ocinlogon("DBASIF","DBASIF","ADEL9I");
+// echo "**** Macon". \$MaCon;
+	}
+	if ( !IsConnectId( \$MaCon ) )
+	{
+		return false;
+	}
+//     odbc_autocommit(\$MaCon,True);
+// echo "*****CONNECT OK****";
+	\$IdConnect = \$MaCon;
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// Fonction CloseBase
+// -----------------------------------------------------------------------------
+// OBJET FONCTION : ferme la connexion paseeÃ© en parametre.
+// --------------
+// Prototype :
+// bool CloseBase(\$IdConnect)
+//
+// ParamÃ¨tres  en entrÃ©e :
+//              - Obligatoires :
+//                      - \$IdConnect : rÃ©fÃ©rence sur identifiant de connection.
+//              - Facultatifs  :
+//
+//
+// ParamÃ¨tres en sortie :
+//
+//
+// Exemples d'appel de la mÃ©thode :
+// CloseBase(\$MaConnexionID);
+//------------------------------------------------------------------------------
+function CloseBase( &\$IdConnect )
+{
+	/*   \$numargs = func_num_args();
+	  if (\$numargs < 1)
+	  return false;  // aucun paramÃ¨tre.
+	  if ( ! IsConnectId(\$IdConnect))
+	  return false;  // le parametre n'est pas un identifiant de connection.
+	  ocilogoff(\$IdConnect);;
+	  \$IdConnect = false; */
+	return true;
+}
+
+function CloseBaseEndScript()
+{
+// ALE : WTF ???? \$this outide a class ...
+/*
+	if ( !IsConnectId( \${\$this->Base_Appelee}["ID_CON"] ) )
+		return false;  // le parametre n'est pas un identifiant de connection.
+	ociclose( \$GLOBALS[\$this->Base_Appelee]["ID_CON"] );
+*/
+	
+	// sert a qq chose 
+	//\$IdConnect								 = false;
+	
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// Fonction Authentification
+// -----------------------------------------------------------------------------
+// OBJET FONCTION : VÃ©fie qu'un couple User-Password est valide
+// --------------
+// Prototype :
+// int Authentification(\$User, \$Password)
+//
+// ParamÃ¨es  en entrÃ©:
+//              - Obligatoires :
+//                      - \$User : Code utilisateur
+//						- \$Password : Mot de passe
+//              - Facultatifs  :
+//
+//
+// ParamÃ¨es en sortie :
+// 			  	 - Code du message d'erreur ou 0 si OK.
+//
+// Exemples d'appel de la mÃ©ode :
+// Retour = Authentification(\$MonUser, \$MonPassword);
+//------------------------------------------------------------------------------
+function Authentification( \$User, \$Password )
+{
+	\$numargs						 = func_num_args();
+	if ( \$numargs < 2 )
+		return 9998;
+	\$param['CDUSER']['Valeur']		 = \$User;
+	\$param['CDUSER']['Affichee']	 = "";
+	\$param['CDUSER']['Recherchee']	 = true;
+	\$param['CDPSW']['Valeur']		 = \$Password;
+	\$param['CDPSW']['Affichee']		 = "";
+	\$param['CDPSW']['Recherchee']	 = true;
+// 	\$SqlReq1 = "{CALL DBASIF.ICYAUT1('::CDSESSION',::IDREQUETE,'::CDUSER','::CDPSW')}";
+	\$SqlReq1						 = "begin  ICYAUT1.ICYAUT1('::CDSESSION',::IDREQUETE,'::CDUSER','::CDPSW'); end;";
+	//
+	\$Req1							 = new Requete( \$SqlReq1, "A", \$param, "Oracle", "ADEL" );
+	if ( \$Req1->Retour_T['Num_Mess'] == 0 )
+		return \$Req1->Sortie_T['CDMESSAGE']['Valeur'];
+	else
+		return \$Req1->Retour_T['Num_Mess'];
+}
+
+// -----------------------------------------------------------------------------
+// Fonction NouveauPSW
+// -----------------------------------------------------------------------------
+// OBJET FONCTION : Change le mot de passe d'un utilisateur
+// --------------
+// Prototype :
+// int NouveauPSW(\$User, \$Password)
+//
+// ParamÃ¨es  en entrÃ©:
+//              - Obligatoires :
+//                      - \$User : Code utilisateur
+//						- \$Password : Mot de passe
+//              - Facultatifs  :
+//
+//
+// ParamÃ¨es en sortie :
+// 			  	 - Code du message d'erreur ou 0 si OK.
+//
+// Exemples d'appel de la mÃ©ode :
+// Retour = NouveauPSW(\$MonUser, \$MonPassword);
+//------------------------------------------------------------------------------
+function NouveauPSW( \$User, \$Password )
+{
+	\$numargs					 = func_num_args();
+	if ( \$numargs < 2 )
+		return 9999;
+	\$param["CDUSER"]["Valeur"]		 = \$User;
+	\$param["CDUSER"]["Affichee"]	 = '';
+	\$param["CDUSER"]["Recherchee"]	 = true;
+	\$param["CDPSW"]["Valeur"]		 = \$Password;
+	\$param["CDPSW"]["Affichee"]		 = '';
+	\$param["CDPSW"]["Recherchee"]	 = true;
+//	\$SqlReq1 = "{CALL DBASIF.ICYPSW1('::CDSESSION',::IDREQUETE,'::CDUSER','::CDPSW')}";
+	\$SqlReq1					 = "begin  ICYPSW1.ICYPSW1('::CDSESSION',::IDREQUETE,'::CDUSER','::CDPSW'); end;";
+	//
+	\$Req1						 = new Requete( \$SqlReq1, "P", \$param, "Oracle", "ADEL" );
+	if ( \$Req1->Retour_T[Num_Mess] == 0 )
+		return \$Req1->Sortie_T['CDMESSAGE']['Valeur'];
+	else
+		return \$Req1->Retour_T['Num_Mess'];
+}
+
+// -----------------------------------------------------------------------------
+//  Fonction pour transcoder les requetes ADA D en Oracle
+//
+// -----------------------------------------------------------------------------
+function TrancodificationRequeteADABASD( \$Requete )
+{
+	global \$IC_BASE, \$IC_LANGAGE_SQL;
+	\$Requete		 = str_replace( chr( 13 ), ' ', \$Requete );
+	\$Requete		 = str_replace( "\n", ' ', \$Requete );
+	// \$Requete = eregi_replace ("  {1,}",' ',\$Requete);
+	// if ( \$IC_BASE != 'ORACLE') return \$Requete;
+	if ( \$IC_LANGAGE_SQL != 'ADABASD' )
+		return \$Requete;
+	\$C_SEP_F		 = '([ ,(])';
+	// --------------------------------------------------------------------------
+	// Remplacer tous les value( par NVL(
+	// --------------------------------------------------------------------------
+	\$Fonction_ADABAS = '[Vv][Aa][Ll][Uu][Ee]';
+	\$Fonction_Oracle = 'NVL';
+	\$Requete		 = preg_replace( '%' . \$C_SEP_F . '(' . \$Fonction_ADABAS . ')[ ]*[(]%', '\\1' . \$Fonction_Oracle . '(', \$Requete );
+	// --------------------------------------------------------------------------
+	// Remplacer tous les CHR( par TO_CHAR(
+	// --------------------------------------------------------------------------
+	\$Fonction_ADABAS = '[Cc][Hh][Rr]';
+	\$Fonction_Oracle = 'TO_CHAR';
+	\$Requete		 = preg_replace( '%' . \$C_SEP_F . '(' . \$Fonction_ADABAS . ')[ ]*[(]%', '\\1' . \$Fonction_Oracle . '(', \$Requete );
+	// --------------------------------------------------------------------------
+	// Remplacer tous les NUM( par TO_NUMBER(
+	// --------------------------------------------------------------------------
+	\$Fonction_ADABAS = '[Nn][Uu][Mm]';
+	\$Fonction_Oracle = 'TO_NUMBER';
+	\$Requete		 = preg_replace( '%' . \$C_SEP_F . '(' . \$Fonction_ADABAS . ')[ ]*[(]%', '\\1' . \$Fonction_Oracle . '(', \$Requete );
+	// --------------------------------------------------------------------------
+	// Remplacer tous les & par || 
+	// --------------------------------------------------------------------------
+	\$Requete		 = eregi_replace( '[\&]', '||', \$Requete );
+	// --------------------------------------------------------------------------
+	// Remplacer EXCEPT par MINUS
+	// --------------------------------------------------------------------------
+	\$Requete		 = eregi_replace( ' EXCEPT ', ' MINUS ', \$Requete );
+	// --------------------------------------------------------------------------
+	// Remplacer DATE par SYSDATE
+	// --------------------------------------------------------------------------
+	\$MotCle_ADABAS	 = '[Dd][Aa][Tt][Ee]';
+	\$C_Sep_MC_Av	 = '([ ,=><(])';
+	\$C_Sep_MC_Ap	 = '([ ,=><)])';
+	\$Requete		 = preg_replace( '%' . \$C_Sep_MC_Av . '(' . \$MotCle_ADABAS . ')' . \$C_Sep_MC_Ap . '%', '\\1SYSDATE\\3', \$Requete );
+	// --------------------------------------------------------------------------
+	// Remplacer ROWNO par ROWNUM
+	// --------------------------------------------------------------------------
+	\$MotCle_ADABAS	 = '[Rr][Oo][Ww][Nn][Oo]';
+	\$C_Sep_MC_Av	 = '([ ,=><(])';
+	\$C_Sep_MC_Ap	 = '([ ,=><)])';
+	\$Requete		 = preg_replace( '%' . \$C_Sep_MC_Av . '(' . \$MotCle_ADABAS . ')' . \$C_Sep_MC_Ap . '%', '\\1ROWNUM\\3', \$Requete );
+	return \$Requete;
+}
+
+function TrancodificationValeurADABASD( \$CodeRubrique, \$Valeur )
+{
+	global \$IC_BASE, \$IC_LANGAGE_SQL, \$TRubriques;
+	return \$Valeur;
+
+	if ( \$IC_LANGAGE_SQL != 'ADABASD' )
+		return \$Valeur;
+	//  echo "<br> *** \$CodeRubrique :". \$TRubriques[\$CodeRubrique]['TYPE'];
+	if ( \$TRubriques[\$CodeRubrique]['TYPE'] == 'DATE' )
+	{
+		//    echo "<br> *** date";
+		\$Pattern = "/(19|20)(\d{2})-(\d{2})-(\d{2})/";
+		\$Replace = "\\4/\\3/\\1\\2";
+		if ( preg_match( \$Pattern, \$Valeur, \$Matches ) )
+		{
+			\$Valeur = preg_replace( \$Pattern, \$Replace, \$Valeur );
+		}
+	}
+	return \$Valeur;
+}
+
+/**
+ * 
+ * @Author : Nawal MALKHAOUI
+ * @Date : 05/04/2012
+ * @CT: MAINTENANCE 1          
+ * @desc : methode permet d'enregistrer les requetes executÃ© de type Procedure
+ *      C'est la historisation des requetes executÃ©es.
+ * @param : \$request string  valeur est addslashes(\$this-> SqlExec)
+ *          \$prog string valeur est \$this-> SqlDem    
+ *       
+ * */
+function saveHistory( \$request )
+{
+	\$params											 = array();
+	\$params['cdutil']['Recherchee']					 = true;
+	\$params['requete']['Recherchee']				 = true;
+	\$params['cdprog']['Recherchee']					 = true;
+	\$params['historyRequestToIcLogA0']['Recherchee'] = true;
+	\$params['cdutil']['Valeur']						 = \$_SESSION["CDUSER"];
+	\$params['requete']['Valeur']					 = \$request; //addslashes(\$this-> SqlExec);
+	\$params['cdprog']['Valeur']						 = \$request; //\$this-> SqlDem ;
+	\$params['historyRequestToIcLogA0']['Valeur']	 = true;
+
+	\$posDebut					 = strpos( \$params['cdprog']['Valeur'], ' ' );
+	\$posFin						 = strpos( \$params['cdprog']['Valeur'], '.', \$posDebut + 1 );
+	\$params['cdprog']['Valeur']	 = substr( \$params['cdprog']['Valeur'], \$posDebut + 1, \$posFin - \$posDebut - 1 );
+
+	\$SqlReq1 = "begin  DBASIF.ICYLOG('::cdutil', '::cdprog','::requete'); end;";
+	\$Req1	 = new Requete( \$SqlReq1, "P", \$params );
+}
+
+// -----------------------------------------------------------------------------
+// Fonction RecupererKU /* V8.1.6 */
+// -----------------------------------------------------------------------------
+// OBJET FONCTION : Recuperer le Key User pour l'utilisateur courrent
+// --------------
+// Prototype :
+// string Authentification(\$User)
+//
+// ParamÃ¨es  en entrÃ©:
+//              - Obligatoires :
+//                      - \$User : Code utilisateur
+//
+// ParamÃ¨es en sortie :
+// 			  	 - Nom du KU ou empty string si aucun trouvÃ©
+//
+// Exemples d'appel de la mÃ©ode :
+// \$NomKU = RecupererKU(\$MonUser);
+//------------------------------------------------------------------------------
+function RecupererKU( \$User )
+{
+	\$NomKU = '';
+	if ( !\$TRANSACTION["ErreurLecture"] )
+	{
+		\$MesParams["CDUSER"]["Valeur"]		 = \$User;
+		\$MesParams["CDUSER"]["Recherchee"]	 = true;
+		\$SqlReq1							 = " /* OBTERNIR LE KU DE L'ORGANIZATION SI L'UTILISATEUR A UN PROFIL FF */
+					SELECT 
+                      '1' AS PRIORITE,
+                      USRKU.LIUSER AS NOMKU
+                    FROM 
+					IC_USER USR INNER JOIN IC_GRPF GRPF ON 
+						USR.CDUSER = GRPF.CDUSER AND 
+						GRPF.CDAPPLI = 'FF'
+                    INNER JOIN FF_TPR TPR ON 
+						USR.CDORG = TPR.CDORG
+                    INNER JOIN IC_USER USRKU ON 
+						TPR.CDUTILKU = USRKU.CDUSER
+                    WHERE USR.CDUSER = UPPER('::CDUSER')
+                    
+                    UNION ALL                        
+                    
+					/* OBTERNIR LE KU DE L'APPLICATION FF SI L'UTILISATEUR A UN PROFIL FF */
+                    SELECT 
+                      '2' AS PRIORITE,
+                      USRKU.LIUSER AS NOMKU  
+                    FROM 
+					IC_USER USR INNER JOIN IC_GRPF GRPF ON 
+						USR.CDUSER = GRPF.CDUSER AND 
+						GRPF.CDAPPLI = 'FF'
+                    INNER JOIN IC_GRKU GRKU ON 
+						USR.CDORG = GRKU.CDORG AND 
+						GRPF.CDAPPLI = GRKU.CDAPPLI
+                    INNER JOIN IC_USER USRKU ON 
+						GRKU.CDUSER = USRKU.CDUSER 
+                    WHERE USR.CDUSER = UPPER('::CDUSER')
+                    
+					UNION ALL
+					
+					/* OBTERNIR LE KU DE L'APPLICATION FD SI L'UTILISATEUR A UN PROFIL FD */
+					SELECT 
+                      '3' AS PRIORITE,
+                      USRKU.LIUSER AS NOMKU  
+                    FROM 
+					IC_USER USR INNER JOIN IC_GRPF GRPF ON 
+						USR.CDUSER = GRPF.CDUSER AND 
+						GRPF.CDAPPLI = 'FD'
+                    INNER JOIN IC_GRKU GRKU ON 
+						USR.CDORG = GRKU.CDORG AND 
+						GRPF.CDAPPLI = GRKU.CDAPPLI
+                    INNER JOIN IC_USER USRKU ON 
+						GRKU.CDUSER = USRKU.CDUSER 
+                    WHERE USR.CDUSER = UPPER('::CDUSER')
+					
+					/* TRIER POUR POUVOIR EXTRAIRE LA PLUS GRANDE PRIORITE DANS PHP */
+                    ORDER BY PRIORITE ASC";
+		\$Req1								 = new Requete( \$SqlReq1, "S", \$MesParams, null, null, -1 );
+		if ( \$Req1->Retour_T["Num_Mess"] != 0 )
+		{
+			\$MESSAGE["NumMess"]	 = \$Req1->Retour_T["Num_Mess"];
+			\$MESSAGE["Libelle"]	 = ArretTransaction( \$MESSAGE["NumMess"] );
+		}
+		else
+		{
+			if ( \$Req1->NbLigne > 0 )
+			{
+				// le KU avec la plus grande priorite
+				\$NomKU = \$Req1->Result[0]['NOMKU'];
+			}
+		} // fin lecture base de donnÃ©es
+	}
+
+	return \$NomKU;
+}
 
 
 EOL;
 
         $this->view        = false;
         $this->layout_name = false;
-        $file_name         = $this->_path . "/tnsnames.ora";
+        $file_name         = $this->_path . "/include/IC_Requete.inc.php";
 
         file_put_contents($file_name, $data);
+    }
+
+    function addTimeZoneToFfFF0PAG1()
+    {
+        $this->view        = false;
+        $this->layout_name = false;
+        $file_name         = $this->_path . "/FF/FF0PAG1.php";
+
+
+        $data = file_get_contents($file_name);
+
+        $data2 = preg_replace("/<\?php(\r|\s|\t|\n)/", "<?php\ndate_default_timezone_set(\"Europe/Paris\");\n", $data, -1, $count);
+
+        file_put_contents($file_name, $data2);
+    }
+
+    function addTimeZoneToFd0PAG1()
+    {
+        $this->view        = false;
+        $this->layout_name = false;
+        $file_name         = $this->_path . "/FD/FD0PAG1.php";
+
+
+        $data = file_get_contents($file_name);
+
+        $data2 = preg_replace("/<\?php(\r|\s|\t|\n)/", "<?php\ndate_default_timezone_set(\"Europe/Paris\");\n", $data, -1);
+        $data3 = str_replace('error_reporting( E_ALL ^ E_NOTICE );', 'error_reporting( E_ALL ^ E_NOTICE  ^ E_DEPRECATED);', $data2);
+
+
+        file_put_contents($file_name, $data3);
+    }
+
+    function addIC0PAG1P()
+    {
+        $this->view        = false;
+        $this->layout_name = false;
+        $file_name         = $this->_path . "/SY/IC0PAG1P.php";
+
+
+        $data = file_get_contents($file_name);
+
+        $data2 = str_replace('include_once($PAGE["CDPROG"].".php");', 'require_once(dirname(__DIR__).$PAGE["CDPROG"].".php");', $data);
+
+        file_put_contents($file_name, $data2);
+    }
+
+    function removeGetByRef()
+    {
+        $this->view        = false;
+        $this->layout_name = false;
+
+        $files = $this->getFilesNames();
+
+        $i   = 0;
+        $out = array();
+
+
+        $function_list = array();
+
+        foreach ($files as $file_name) {
+
+            $data = file_get_contents($file_name);
+
+            preg_match_all("#([a-zA-Z_]{1}[a-zA-Z0-9_]*)[ ]*\((.+)\)[ ]*;#U", $data, $out, PREG_PATTERN_ORDER);
+
+
+            $i = 0;
+            foreach ($out[2] as $params) {
+                //print_r($params);
+                $vars = explode(",", $params);
+                foreach ($vars as $var) {
+                    $var = trim($var);
+
+                    if (mb_substr($var, 0, 2) === "&$") {
+
+                        //print_r($out);
+                        //echo $out[1][$i] . " ( " . $var . " )\n";
+                        echo $out[0][$i] . "\n";
+
+
+                        $function_list[] = $out[1][$i];
+                    }
+                }
+
+                $i++;
+            }
+
+
+            //file_put_contents($file_name, $data);
+        }
+
+        $alpha = array_count_values($function_list);
+
+        print_r($alpha);
+
+        $function_list = array_unique($function_list);
+        print_r($function_list);
+
+        /*
+         *   
+
+          Array
+          (
+          [LectureUsersAdel] => 2
+          [FG_Afficher_Liste_V12] => 26
+          [odbc_fetch_into] => 14
+          [FF_Controle_Autorisation] => 283
+          [FG_Afficher_Liste_V13] => 5
+          [FG_Afficher_Liste_V16] => 47
+          [lecturedesdonnees] => 21
+          [LectureDesDonnees] => 94
+          [print_r] => 6
+          [Controle_critere_affichage] => 4
+          [gestion_lien_jalon_task] => 2
+          [Controle_PONDJAL] => 1
+          [recherche_wpo] => 20
+          [LectureDesDonnees_FF5MNP2] => 1
+          [gestion_libelle_cbs] => 1
+          [gestion_affichage_detail_npoh] => 6
+          [AlimentationLignesForecast] => 1
+          [GenerationLignesProjet] => 2
+          [InitialisationLigneProjetErreur] => 2
+          [LectureDonnees] => 15
+          [RAPPROCHEMENT_JALON] => 2
+          [LectureWORKPACKAGE] => 2
+          [LectureProjet] => 1
+          [LectureDesDonnees_FF5MIR] => 1
+          [LectureLigneCbs] => 2
+          [LectureCashout] => 2
+          [LectureVO] => 2
+          [AlimentationLignesSynthese] => 2
+          [LectureOpportunites] => 2
+          [Recup_liste_otp_FF2DDW] => 1
+          [ProtegerChamps] => 3
+          [CommpleterLigneWorkpackage] => 1
+          [FF5RWP_genere_requete_DEP] => 3
+          [FF5RWP_genere_requete_ECO] => 3
+          [FF5RWP_genere_requete_HCO] => 2
+          [FF5RWP_Genere_requete_RISKSAVING] => 2
+          [alimentationlignessyntheseProjet] => 1
+          [LectureArborescenteResponsable] => 4
+          [LectureImputations] => 1
+          [Lecture_AVANCEMENT_PHYSIQUE] => 1
+          [lecturedesdonneesSAV] => 1
+          [LectureTransfert] => 2
+          [FG_Afficher_Liste_V15] => 8
+          [Controle_PCPOTASK] => 1
+          [AlimentationLignesComparatif] => 2
+          [LectureRevuesCDB] => 3
+          [lecturedesdonneesfiche] => 1
+          [Email_User] => 7
+          [lecture] => 6
+          [TestIURecursif] => 2
+          [generer_shape] => 1
+          )
+
+
+         */
+    }
+
+    function replaceCtrlM()
+    {
+
+        $this->view        = false;
+        $this->layout_name = false;
+
+        $files = $this->getFilesNames();
+
+        foreach ($files as $file_name) {
+
+            $data = file_get_contents($file_name);
+
+            $data = str_replace("\x0D", "\n", $data);
+            //$data = preg_replace('/\s\s+/', "\n", $data);
+
+            file_put_contents($file_name, $data);
+        }
     }
 
 }
