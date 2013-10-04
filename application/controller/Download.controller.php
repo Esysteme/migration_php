@@ -1,0 +1,1 @@
+<?phpuse \glial\synapse\Controller;class Download extends Controller{    function index()    {        $this->title = __("Download");        $this->ariane = "> " . $this->title;    }}?>

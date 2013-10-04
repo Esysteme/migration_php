@@ -1,0 +1,1 @@
+<?phpecho __("All rights have been updated");?>

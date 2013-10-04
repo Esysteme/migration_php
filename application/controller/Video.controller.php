@@ -1,0 +1,1 @@
+<?phpuse \glial\synapse\Controller;class Video extends Controller{    function index()    {        echo "ceci est un test";    }    function blockLastVideo($param)    {        $this->set("data", $data);    }}?>

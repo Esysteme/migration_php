@@ -1,0 +1,1 @@
+<?phpecho __("The tables haven been updated !");

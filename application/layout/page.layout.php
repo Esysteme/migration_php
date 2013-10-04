@@ -1,0 +1,1 @@
+<?phpecho "<div id=\"title\">";//$_SITE['Title'] = __("Registration");echo "<h2>".$GLIALE_TITLE."<br />";echo "<span><a href=\"".WWW_ROOT."\">".__("Home")."</a> ".$GLIALE_ARIANE."</span>";echo "</h2>";echo "</div>";get_flash();echo $GLIALE_CONTENT;?>
