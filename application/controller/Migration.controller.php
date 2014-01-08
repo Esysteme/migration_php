@@ -50,6 +50,7 @@ class Migration extends Controller
 
     function all()
     {
+        $this->addTimeZoneToFd0PAG1(); // add default time zone
         $this->replaceCtrlM(); // remove ^M and replace by \n
         $this->replaceIdentification();  //replace Commun/IC_Identification.php
         $this->replaceIcRequete();  //replace /include/IC_Requete.inc.php
@@ -62,8 +63,12 @@ class Migration extends Controller
         $this->addFullPath(); // repalce include file.php by include __DIR__."file.php"
 
         $this->addTimeZoneToFfFF0PAG1(); // add default time zone
-        $this->addTimeZoneToFd0PAG1(); // add default time zone
         //deprecated
+        $this->removeDeprecated();
+        
+        
+        $this->removeGetByRef();
+
         //$this->addIC0PAG1P(); // add default time zone
     }
 
@@ -81,7 +86,9 @@ class Migration extends Controller
             $data = file_get_contents($file);
 
             $count = 0;
-            $data2 = preg_replace("#<\?(\s|\t|\n|/)#", "<?php\n", $data, -1, $count);
+            $data = preg_replace("#<\?/#", "<?php\n/", $data, -1, $count);
+            
+            $data2 = preg_replace("#<\?(\s|\t|\n)#", "<?php\n", $data, -1, $count);
 
             echo (!empty($count)) ? $i . ':' . $count . ':' . $file . EOL : "";
 
@@ -1026,14 +1033,16 @@ require_once('IC_Header.inc.php');
 
         </TD></TR>
 </TABLE>
-<?
+<?php
 // -----------------------------------------------------------------------------
 // Inclure le HTML de l'entête de la page
 // -----------------------------------------------------------------------------
 require_once('IC_Footer.inc.php');
 
-        if (in_array(\$_SERVER['REMOTE_ADDR'], array("192.168.24.1", '192.168.168.1', '192.168.169.1'))) {
+        if (in_array(\$_SERVER['REMOTE_ADDR'], array("192.168.24.1", '192.168.168.1', '192.168.169.1')) || true) {
+                echo "XXXXXXXXXXXXXXXXXXXXXXXX";
             if (!empty(\$GLOBALS['tab_sql'])) {
+                echo "WWWWWWWWWWWWWWWWWWWWW";
                 \$i = 1;
                 echo '<table border ="1">';
                 foreach (\$GLOBALS['tab_sql'] as \$elem) {
@@ -1472,12 +1481,15 @@ class requete
 				// --------------------------------------------------------------------------
 				// Remplacer tous les '{CALL ' par begin
 				// --------------------------------------------------------------------------
-				\$Fonction_debut			 = '{[Cc][Aa][Ll][Ll] ';
+			//	\$Fonction_debut			 = '{[Cc][Aa][Ll][Ll] ';
+				\$Fonction_debut			 = '{CALL ';
 				\$Fonction_debut_Oracle	 = 'begin ';
-				\$this->SqlExec			 = eregi_replace( \$Fonction_debut, \$Fonction_debut_Oracle, \$this->SqlExec );
+			//	\$this->SqlExec			 = eregi_replace( \$Fonction_debut, \$Fonction_debut_Oracle, \$this->SqlExec );
+				\$this->SqlExec			 = str_ireplace ( \$Fonction_debut, \$Fonction_debut_Oracle, \$this->SqlExec );
 				\$Fonction_debut2		 = '}';
 				\$Fonction_debut2_Oracle	 = '; end;';
-				\$this->SqlExec			 = eregi_replace( \$Fonction_debut2, \$Fonction_debut2_Oracle, \$this->SqlExec );
+			//	\$this->SqlExec			 = eregi_replace( \$Fonction_debut2, \$Fonction_debut2_Oracle, \$this->SqlExec );
+				\$this->SqlExec			 = str_ireplace( \$Fonction_debut2, \$Fonction_debut2_Oracle, \$this->SqlExec );
 				\$pos_nom				 = strpos( \$this->SqlExec, 'DBASIF' );
 				\$pos_parenthese			 = strpos( \$this->SqlExec, '(' );
 				\$Tmp_call				 = substr( \$this->SqlExec, 0, \$pos_nom )
@@ -1763,7 +1775,7 @@ function ConnectBase( &\$IdConnect, \$base )
 		return false;  // aucun paramÃ¨tre.
 // debut traitement
 
-
+        // echo "------------\$base-----------";
 
 	if ( \$base == 'DWH' )
 	{
@@ -1771,17 +1783,19 @@ function ConnectBase( &\$IdConnect, \$base )
 	}
 	if ( \$base == 'ADEL' )
 	{
-
+        //SBCCH10186.ad.sys:1523/ADELPREP
 		//putenv("TNS_ADMIN=/usr/local/Zend/Core/network/admin/");
 		//print_r(\$GLOBALS['IC_TNSNAME']);
 		//ADELDEV <= GLOBALS['IC_TNSNAME']
 
+                
+                // =>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> this connect is used for ADEL
 		\$MaCon = ocinlogon( "PHP", "JGMWEB", "(DESCRIPTION =
     (ADDRESS_LIST =
-      (ADDRESS = (PROTOCOL = TCP)(Host = sbcch10199.ad.sys)(Port = 1523))
+      (ADDRESS = (PROTOCOL = TCP)(Host = SBCCH10186.ad.sys)(Port = 1523))
     )
     (CONNECT_DATA =
-      (SID = ADELDEV)
+      (SID = ADELPREP)
     )
   )" ) or die( "pb connection" );
 //           \$MaCon = ocinlogon("DBASIF","DBASIF","ADELPROD");
@@ -1793,9 +1807,7 @@ function ConnectBase( &\$IdConnect, \$base )
 		  die();
 		  } */
 
-//            \$MaCon = ocinlogon("DBASIF","DBASIF","ADELDEV");  
-//            \$MaCon = ocinlogon("DBASIF","DBASIF","ADEL");
-//           \$MaCon = ocinlogon("DBASIF","DBASIF","ADEL9I");
+
 // echo "**** Macon". \$MaCon;
 	}
 	if ( !IsConnectId( \$MaCon ) )
@@ -1974,11 +1986,13 @@ function TrancodificationRequeteADABASD( \$Requete )
 	// --------------------------------------------------------------------------
 	// Remplacer tous les & par || 
 	// --------------------------------------------------------------------------
-	\$Requete		 = eregi_replace( '[\&]', '||', \$Requete );
+	// \$Requete		 = eregi_replace( '[\&]', '||', \$Requete );
+	\$Requete		 = str_replace( '&', '||', \$Requete );
 	// --------------------------------------------------------------------------
 	// Remplacer EXCEPT par MINUS
 	// --------------------------------------------------------------------------
-	\$Requete		 = eregi_replace( ' EXCEPT ', ' MINUS ', \$Requete );
+	// \$Requete		 = eregi_replace( ' EXCEPT ', ' MINUS ', \$Requete );
+	\$Requete		 = str_ireplace( ' EXCEPT ', ' MINUS ', \$Requete );
 	// --------------------------------------------------------------------------
 	// Remplacer DATE par SYSDATE
 	// --------------------------------------------------------------------------
@@ -2227,9 +2241,14 @@ EOL;
 
                         //print_r($out);
                         //echo $out[1][$i] . " ( " . $var . " )\n";
-                        echo $out[0][$i] . "\n";
+                        echo $file_name.":".$out[0][$i] . "\n";
 
 
+                        $string_to_replace =  str_replace('&$', '$', $out[0][$i]);
+                        $data =  str_replace($out[0][$i], $string_to_replace, $data);
+                        
+                        
+                        
                         $function_list[] = $out[1][$i];
                     }
                 }
@@ -2237,8 +2256,37 @@ EOL;
                 $i++;
             }
 
+            
+            preg_match_all('#([a-zA-Z_]{1}[a-zA-Z0-9_]*)\["\w+"\]?[ ]*\((.+)\)[ ]*;#U', $data, $out, PREG_PATTERN_ORDER);
 
-            //file_put_contents($file_name, $data);
+
+            $i = 0;
+            foreach ($out[2] as $params) {
+                //print_r($params);
+                $vars = explode(",", $params);
+                foreach ($vars as $var) {
+                    $var = trim($var);
+
+                    if (mb_substr($var, 0, 2) === "&$") {
+
+                        //print_r($out);
+                        //echo $out[1][$i] . " ( " . $var . " )\n";
+                        echo $file_name.":".$out[0][$i] . "\n";
+
+
+                        $string_to_replace =  str_replace('&$', '$', $out[0][$i]);
+                        $data =  str_replace($out[0][$i], $string_to_replace, $data);
+                        
+                        
+                        
+                        $function_list[] = $out[1][$i];
+                    }
+                }
+
+                $i++;
+            }
+
+            file_put_contents($file_name, $data);
         }
 
         $alpha = array_count_values($function_list);
@@ -2329,5 +2377,22 @@ EOL;
         }
     }
 
-}
+    function removeDeprecated()
+    {
+        echo "Traitement des fonctions deprecated\n";
 
+
+        $this->view        = false;
+        $this->layout_name = false;
+
+        $file      = "/include/IC_MENU_MULTI_NIVEAUX.inc.php";
+        $file_name = $this->_path . $file;
+        $data      = file_get_contents($file_name);
+
+
+        $data = str_replace("split", "explode", $data);
+
+        file_put_contents($file_name, $data);
+    }
+
+}
