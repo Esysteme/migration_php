@@ -2,6 +2,7 @@
 
 use \Glial\Synapse\Controller;
 use \Glial\Tools\Recursive;
+use \Glial\Shell\Color;
 
 class Migration extends Controller
 {
@@ -9,7 +10,9 @@ class Migration extends Controller
     public $_path      = "/home/www/adel";
 //public $_path      = "/home/www/old_php5_adel";
     public $_blacklist = array("/GRAPH/");
-
+	public $_func_called = array();
+	
+	
     function __contruct()
     {
         
@@ -50,24 +53,41 @@ class Migration extends Controller
 
     function all()
     {
-        $this->addTimeZoneToFd0PAG1(); // add default time zone
+        //$this->addTimeZoneToFd0PAG1(); // add default time zone
         $this->replaceCtrlM(); // remove ^M and replace by \n
-        $this->replaceIdentification();  //replace Commun/IC_Identification.php
-        $this->replaceIcRequete();  //replace /include/IC_Requete.inc.php
+        $this->replace_returncarriage();
         $this->replaceShortTag(); // replace <? by <?php
 
+        $this->replaceIdentification();  //replace Commun/IC_Identification.php
+        $this->replaceIcRequete();  //replace /include/IC_Requete.inc.php
+
+
         $this->replaceConst(); // replace $ggg[gg] by $ggg['gg']
+        $this->replaceConst(); // replace $ggg[gg] by $ggg['gg']
+        $this->replaceConst(); // replace $ggg[gg] by $ggg['gg']
+        $this->replaceConst(); // replace $ggg[gg] by $ggg['gg']
+        $this->replaceConst(); // replace $ggg[gg] by $ggg['gg']
+        //$this->checkConst(); // replace $ggg[gg] by $ggg['gg']
+
 
         $this->putConst(); // replace realconstante $ggg[gg] by  $ggg['gg']
         $this->addConfigFile(); // add /include/IC_ENVIRONNEMENT.php
         $this->addFullPath(); // repalce include file.php by include __DIR__."file.php"
-
-        $this->addTimeZoneToFfFF0PAG1(); // add default time zone
+        //$this->addTimeZoneToFfFF0PAG1(); // add default time zone
         //deprecated
+
         $this->removeDeprecated();
-        
-        
+
+
+        $this->add_and_in_func();
+
+
+
         $this->removeGetByRef();
+        //$this->replace_char_wrong();
+        $this->replace_ereg();
+
+
 
         //$this->addIC0PAG1P(); // add default time zone
     }
@@ -86,8 +106,8 @@ class Migration extends Controller
             $data = file_get_contents($file);
 
             $count = 0;
-            $data = preg_replace("#<\?/#", "<?php\n/", $data, -1, $count);
-            
+            $data  = preg_replace("#<\?/#", "<?php\n/", $data, -1, $count);
+
             $data2 = preg_replace("#<\?(\s|\t|\n)#", "<?php\n", $data, -1, $count);
 
             echo (!empty($count)) ? $i . ':' . $count . ':' . $file . EOL : "";
@@ -106,6 +126,108 @@ class Migration extends Controller
         $i = 0;
         foreach ($files as $file_name) {
 
+            $data = "";
+
+            $data = file_get_contents($file_name);
+
+
+            // preg_match_all('#[^\\]\$[a-zA-Z_]{1}[a-zA-Z0-9_]*[\-\>[\w]+]?(\[([\[("\w+"|\$\w+)\]])*\])*\[([a-zA-Z_]{1}[a-zA-Z0-9_]*)\]#U', $buffer, $out, PREG_PATTERN_ORDER);
+            // preg_match_all('#[^\\]\$[\w]+[\-\>[\w]+]?(\[([\[("\w+"|\$\w+)\]])*\])*\[([\w]+)\]#U', $buffer, $out, PREG_PATTERN_ORDER);
+            //preg_match_all('/^[\s]*[\$]{1}[\w]+[\-\>[\w]+]?(\[([\[("\w+"|\$\w+)\]])*\])*\[([\w]+)\]/U', $buffer, $out, PREG_PATTERN_ORDER);
+            // \$[\w]+[\-\>[\w]+]?\[[\["\w+"|\$\w+\]]*\]*\[[\w]+\]
+
+            preg_match_all('/[^\\\\]\$[\w]+[\-\>[\w]+]?(\[([\[\'\w+\'|"\w+"|\$\w+\]])*\])*\[([\w]+)\]/U', $data, $out);
+            $nb_to_replace = count($out[0]);
+
+            for ($i = 0; $i < $nb_to_replace; $i++) {
+//echo "[".$out[2][$i]."] => ['".$out[2][$i]."']".PHP_EOL;
+                $new  = str_replace("[" . $out[3][$i] . "]", "[\"" . $out[3][$i] . "\"]", $out[0][$i]);
+                $data = str_replace($out[0][$i], $new, $data);
+                echo $file_name . ":" . $out[0][$i] . " => " . $new . PHP_EOL;
+            }
+
+            file_put_contents($file_name, $data);
+        }
+    }
+
+    function getDate()
+    {
+        $this->view        = false;
+        $this->layout_name = false;
+        $files             = $this->getFilesNames();
+
+
+        $i = 0;
+
+        $out  = array();
+        $data = array();
+        foreach ($files as $file_name) {
+
+
+            $handle = fopen($file_name, "r");
+            if ($handle) {
+                $nbline = 1;
+
+                while (($buffer = fgets($handle)) !== false) {
+                    preg_match_all('/[0-9]{4}[-][0-9]{2}[-][0-9]{2}/U', $buffer, $out);
+
+                    if (count($out[0]) != 0) {
+
+                        //print_r($out);
+                        $data[$file_name][$nbline] = $out[0][0];
+                    }
+                    $nbline++;
+                }
+
+                if (!feof($handle)) {
+                    echo "Error: unexpected fgets() fail\n";
+                }
+                fclose($handle);
+
+                // file_put_contents($file_name, $data);
+            }
+        }
+        print_r($data);
+    }
+
+    function getDate2()
+    {
+        $this->view        = false;
+        $this->layout_name = false;
+        $files             = $this->getFilesNames();
+
+
+        $i = 0;
+        foreach ($files as $file_name) {
+
+            $data = "";
+
+            $data = file_get_contents($file_name);
+
+
+            // preg_match_all('#[^\\]\$[a-zA-Z_]{1}[a-zA-Z0-9_]*[\-\>[\w]+]?(\[([\[("\w+"|\$\w+)\]])*\])*\[([a-zA-Z_]{1}[a-zA-Z0-9_]*)\]#U', $buffer, $out, PREG_PATTERN_ORDER);
+            // preg_match_all('#[^\\]\$[\w]+[\-\>[\w]+]?(\[([\[("\w+"|\$\w+)\]])*\])*\[([\w]+)\]#U', $buffer, $out, PREG_PATTERN_ORDER);
+            //preg_match_all('/^[\s]*[\$]{1}[\w]+[\-\>[\w]+]?(\[([\[("\w+"|\$\w+)\]])*\])*\[([\w]+)\]/U', $buffer, $out, PREG_PATTERN_ORDER);
+            // \$[\w]+[\-\>[\w]+]?\[[\["\w+"|\$\w+\]]*\]*\[[\w]+\]
+
+            preg_match_all("/[0-9]{4}-[0-9]{2}-[0-9]{2}/U", $data, $out);
+
+            if (!empty($out)) {
+                $out[$file_name][$nbline][] = $out;
+            }
+        }
+    }
+
+    function checkConst()
+    {
+        $this->view        = false;
+        $this->layout_name = false;
+        $files             = $this->getFilesNames();
+
+        echo "\n==============================================================================================================\n";
+        $i = 0;
+        foreach ($files as $file_name) {
+
             $data   = "";
             $handle = fopen($file_name, "r");
             if ($handle) {
@@ -114,7 +236,7 @@ class Migration extends Controller
                 $out = array();
 
                 while (($buffer = fgets($handle)) !== false) {
-                    preg_match_all('#\$[a-zA-Z_]{1}[a-zA-Z0-9_]*[\-\>[\w]+]?(\[([\[(.+)\]])*\])*\[([a-zA-Z_]{1}[a-zA-Z0-9_]*)\]#U', $buffer, $out, PREG_PATTERN_ORDER);
+                    preg_match_all('#\[([a-zA-Z_]{1}[a-zA-Z0-9_]*)\]#U', $buffer, $out, PREG_PATTERN_ORDER);
                     $nb_to_replace = count($out[0]);
 
                     for ($i = 0; $i < $nb_to_replace; $i++) {
@@ -132,9 +254,11 @@ class Migration extends Controller
                 }
                 fclose($handle);
 
-                file_put_contents($file_name, $data);
+                //file_put_contents($file_name, $data);
             }
         }
+
+        //die();
     }
 
     function putConst()
@@ -224,7 +348,8 @@ EOL;
         file_put_contents($file_name, $data);
     }
 
-    private function addTnsnames()
+    private
+            function addTnsnames()
     {
 # TNSNAMES.ORA
 
@@ -320,9 +445,8 @@ EOL;
 /* ~FF8.1.40~ */// 10.12.2012 BCO Mpi 2182: Corrige le message d'erreur (\$message_result)
 // ____________________________________________________________________________
 
-date_default_timezone_set( "Europe/Paris" );
 
-define( "TIME_START", microtime( true ) );
+define( "TIME_START", microtime() );
 
 
 error_reporting( E_ALL ^ E_NOTICE ^ E_DEPRECATED );
@@ -384,9 +508,6 @@ foreach ( \$_POST as \$key => \$value )
   \$cduser_recherche	 = (empty( \$_POST["cduser_recherche"] )) ? "" : \$_POST["cduser_recherche"];
   \$AdMail_recherche	 = (empty( \$_POST["AdMail_recherche"] )) ? "" : \$_POST["AdMail_recherche"];
  */
-
-
-
 
 
 
@@ -1256,7 +1377,7 @@ class requete
 
 		if ( \$this->Sortie_T['CDMESSAGE']['Valeur'] == 0 && \$this->TypeSql == 'P' && (!isset( \$param['historyRequestToIcLogA0']['Valeur'] ) || \$param['historyRequestToIcLogA0']['Valeur'] == false) && isset( \$_SESSION['APPLIS']['FF']['CDPROF'] ) && \$_SESSION['APPLIS']['FF']['CDPROF'] == 'A0' )
 		{
-			saveHistory( addslashes( \$this->SqlExec ) );
+			saveHistory( str_replace("'", "''", \$this->SqlExec  ) );
 		}
 	}
 
@@ -1431,7 +1552,8 @@ class requete
 		if ( \$this->TypeSql == "S" )
 		{
 			//echo \$this->SqlExec;
-			
+                
+			\$microtime_sql = ( float ) \$msec + ( float ) \$sec;
 			\$this->IdRes = ociparse( \$GLOBALS[\$this->Base_Appelee]["ID_CON"], \$this->SqlExec );
 			if ( !IsResultId( \$this->IdRes ) )
 			{
@@ -1441,9 +1563,32 @@ class requete
 			\$ok = ociexecute( \$this->IdRes );
 			if ( !\$ok )
 			{
-				\$this->RemplissageRetour( 9990, "La Requete a echouee", "EP" );
+				 if ( in_array( \$_SERVER['REMOTE_ADDR'], array("192.168.24.1", '192.168.168.1') ) )
+                 {
+                       echo "" . \$this->SqlExec . "<br />";
+                 }
+   
+                \$this->RemplissageRetour( 9990, "La Requete a echouee", "EP" );
+                
 				return false;
 			}
+            list (\$msec, \$sec) = explode( ' ', microtime() );    
+            \$microtime_sql_end = ( float ) \$msec + ( float ) \$sec;
+                        \$calledFrom = debug_backtrace();
+                        if ( empty( \$GLOBALS['tab_sql'] ) )
+                        {
+                                \$GLOBALS['tab_sql']      = array();
+                                \$GLOBALS['time_sql'] = 0;
+                        }
+                        \$gg = array();
+                        \$gg['sql']               = \$this->SqlExec;
+                        \$gg['file']              = \$calledFrom["1"]['file'];
+                        \$gg['line']              = \$calledFrom["1"]['line'];
+                        \$gg['time']              = round( \$microtime_sql_end - \$microtime_sql, 4 );
+                        \$gg['num_rows']  = oci_num_rows( \$this->IdRes );
+                        \$GLOBALS['tab_sql'][] = \$gg;
+                        \$GLOBALS['time_sql'] += \$microtime_sql_end - \$microtime_sql;    
+                
 			\$res			 = array();
 			//  
 			\$MAX_ROWS_OCI	 = \$this->MAX_ROWS_OCI;
@@ -1735,10 +1880,20 @@ function IsResultId( \$IdResult )
 //------------------------------------------------------------------------------
 function IsConnectId( \$IdConnexion )
 {
-	\$numargs = func_num_args();
+	
+   //var_dump(\$IsConnectId);
+   
+    \$numargs = func_num_args();
 	if ( \$numargs < 1 )
 		return false;
 
+                
+	if ( ! \$IdConnexion  )
+	{
+		return false;
+	}      
+                
+                
 	if ( !Is_Resource( \$IdConnexion ) )
 	{
 		return false;
@@ -2227,7 +2382,7 @@ EOL;
 
             $data = file_get_contents($file_name);
 
-            preg_match_all("#([a-zA-Z_]{1}[a-zA-Z0-9_]*)[ ]*\((.+)\)[ ]*;#U", $data, $out, PREG_PATTERN_ORDER);
+            preg_match_all("#([\w]*)[\s]*\((.+)\)[\s]*;#Us", $data, $out, PREG_PATTERN_ORDER);
 
 
             $i = 0;
@@ -2241,14 +2396,14 @@ EOL;
 
                         //print_r($out);
                         //echo $out[1][$i] . " ( " . $var . " )\n";
-                        echo $file_name.":".$out[0][$i] . "\n";
+                        echo $file_name . ":" . $out[0][$i] . "\n";
 
 
-                        $string_to_replace =  str_replace('&$', '$', $out[0][$i]);
-                        $data =  str_replace($out[0][$i], $string_to_replace, $data);
-                        
-                        
-                        
+                        $string_to_replace = str_replace('&$', '$', $out[0][$i]);
+                        $data              = str_replace($out[0][$i], $string_to_replace, $data);
+
+
+
                         $function_list[] = $out[1][$i];
                     }
                 }
@@ -2256,7 +2411,7 @@ EOL;
                 $i++;
             }
 
-            
+
             preg_match_all('#([a-zA-Z_]{1}[a-zA-Z0-9_]*)\["\w+"\]?[ ]*\((.+)\)[ ]*;#U', $data, $out, PREG_PATTERN_ORDER);
 
 
@@ -2271,14 +2426,14 @@ EOL;
 
                         //print_r($out);
                         //echo $out[1][$i] . " ( " . $var . " )\n";
-                        echo $file_name.":".$out[0][$i] . "\n";
+                        echo $file_name . ":" . $out[0][$i] . "\n";
 
 
-                        $string_to_replace =  str_replace('&$', '$', $out[0][$i]);
-                        $data =  str_replace($out[0][$i], $string_to_replace, $data);
-                        
-                        
-                        
+                        $string_to_replace = str_replace('&$', '$', $out[0][$i]);
+                        $data              = str_replace($out[0][$i], $string_to_replace, $data);
+
+
+
                         $function_list[] = $out[1][$i];
                     }
                 }
@@ -2371,7 +2526,7 @@ EOL;
             $data = file_get_contents($file_name);
 
             $data = str_replace("\x0D", "\n", $data);
-            //$data = preg_replace('/\s\s+/', "\n", $data);
+            $data = preg_replace('/\n\t*\n+/', "\n", $data);
 
             file_put_contents($file_name, $data);
         }
@@ -2395,4 +2550,423 @@ EOL;
         file_put_contents($file_name, $data);
     }
 
+    function replace_char_wrong()
+    {
+        $this->view        = false;
+        $this->layout_name = false;
+
+        $files = $this->getFilesNames();
+
+        $i   = 0;
+        $out = array();
+
+
+        $function_list = array();
+
+        foreach ($files as $file_name) {
+
+            $data = file_get_contents($file_name);
+
+
+            $data = str_replace("\xE8", "è", $data);
+            $data = str_replace("\xE9", "é", $data);
+
+            $data = str_replace('Ã©', 'é', $data);
+
+
+            file_put_contents($file_name, $data);
+        }
+    }
+
+    function get_function()
+    {
+
+        /*
+         * 
+         * function LectureDesDonnees_FF5MIR($Ma_Requete_Sql,
+          $Mes_Parametres_Requete,
+          $MesColonnes,
+          $PAGE_LISTE ){
+         */
+        $this->view        = false;
+        $this->layout_name = false;
+
+        $files = $this->getFilesNames();
+
+
+
+        $out = array();
+
+        $data = array();
+
+        foreach ($files as $file_name) {
+
+            //  echo $file_name."\n";
+            $input_lines = file_get_contents($file_name);
+
+            //echo $data;
+
+            preg_match_all('/function[\s]+[\w]+[\s]*\(\$[^\)]+\)/Ux', $input_lines, $output_array);
+
+
+            if (!empty($output_array[0])) {
+                echo $file_name . "\n";
+                print_r($output_array[0]);
+                // $data[] = $output_array[0];
+            }
+
+            //file_put_contents($file_name, $data);
+        }
+
+        //print_r($data);
+    }
+
+    function replace_returncarriage()
+    {
+
+        /*
+         * 
+         * function LectureDesDonnees_FF5MIR($Ma_Requete_Sql,
+          $Mes_Parametres_Requete,
+          $MesColonnes,
+          $PAGE_LISTE ){
+         * 
+         * 
+         * AlimentationLignesSynthese ( $TamponLecture,$MesColonnes,&$PAGE_LISTE)
+         */
+        $this->view        = false;
+        $this->layout_name = false;
+
+        $files = $this->getFilesNames();
+
+        $out  = array();
+        $data = array();
+
+        
+        //function
+        foreach ($files as $file_name) {
+
+            //  echo $file_name."\n";
+            $input_lines = file_get_contents($file_name);
+            //echo $data;
+
+            preg_match_all('/function[\s]+[\w]+[\s]*\(\$[^\)]+\)/Ux', $input_lines, $output_array);
+
+            if (!empty($output_array[0])) {
+                foreach ($output_array[0] as $func) {
+                    $func2 = str_replace("\n", "", $func);
+
+                    $func2 = preg_replace("/[\s]+/", " ", $func2);
+
+                    echo $func . " => " . $func2 . "\n";
+                    $input_lines = str_replace($func, $func2, $input_lines);
+                }
+            }
+            file_put_contents($file_name, $input_lines);
+        }
+
+		
+        //function called
+		
+        foreach ($files as $file_name) {
+
+            //  echo $file_name."\n";
+            $input_lines = file_get_contents($file_name);
+            //echo $data;
+
+            preg_match_all('/\$?[\w]+\s*[\s*\["\w+"\]\s*]*\([^)]*\&\$[^)]*\);/s', $input_lines, $output_array);
+
+            if (!empty($output_array[0])) {
+                foreach ($output_array[0] as $func) {
+                    $func2 = str_replace("\n", "", $func);
+
+                    $func2 = preg_replace("/[\s]+/", " ", $func2);
+
+                    echo Color::getColoredString( $func, "yellow", "black") . "\n" . Color::getColoredString( $func2, "white", "green")  . "\n";
+
+                    $input_lines = str_replace($func, $func2, $input_lines);
+                }
+            }
+            file_put_contents($file_name, $input_lines);
+        }
+
+
+    }
+
+    function add_and_in_func()
+    {
+        echo "################################################################################################################################\n";
+        echo "GET & when calling function\n";
+        echo "################################################################################################################################\n";
+
+
+
+
+        $this->view        = false;
+        $this->layout_name = false;
+
+        $files = $this->getFilesNames();
+
+        $i   = 0;
+        $out = array();
+
+
+        $function_list = array();
+        $func_list     = array();
+
+        foreach ($files as $file_name) {
+
+            $data = file_get_contents($file_name);
+
+
+
+            //[ ]*[.{1}[\w]+.{1}]*
+            //preg_match_all('#([a-zA-Z_]{1}[a-zA-Z0-9_]*)[ ]*\([^\)](.+)\)[ ]*;#Um', $data, $out, PREG_PATTERN_ORDER);
+            preg_match_all('/([\w]+)\(([^)]*\&\$[^)]*\));/U', $data, $out, PREG_PATTERN_ORDER);
+
+            $i = 0;
+            foreach ($out[2] as $params) {
+                $vars = explode(",", $params);
+
+                $cpt_arg = 0;
+                foreach ($vars as $var) {
+                    $var = trim($var);
+
+                    if (mb_substr($var, 0, 2) === "&$") {
+
+                        //print_r($out);
+                        //echo $out[1][$i] . " ( " . $var . " )\n";
+                        echo Color::getColoredString($file_name, "black", "orange") . ":" . $out[0][$i] . " VALEUR \$cpt_arg => '" . $cpt_arg . "' <=\n";
+
+                        $func_list[$out[1][$i]][count($vars)][$cpt_arg] = 1;
+                    }
+                    $cpt_arg++;
+                }
+
+                $i++;
+            }
+        }
+        print_r($func_list);
+
+
+
+        $func_to_escape = array('FG_Afficher_Liste_V16', 'LectureDesDonnees', 'lecturedesdonnees', 'RAPPROCHEMENT_JALON');
+
+
+        foreach ($func_list as $func => $tab) {
+
+            if (!in_array($func, $func_to_escape)) {
+                $function_list[] = $func;
+            }
+        }
+
+        print_r($function_list);
+
+        //die();
+
+
+        $out  = array();
+        $data = array();
+
+
+
+        echo "################################################################################################################################\n";
+        echo "GET declare function\n";
+        echo "################################################################################################################################\n";
+
+
+        //$pointer = 0;
+        foreach ($files as $file_name) {
+
+            //  echo $file_name."\n";
+            $input_lines = file_get_contents($file_name);
+            //echo $data;
+
+            $output_array = array();
+            preg_match_all('/function[\s]+([\w]+)[\s]*\((.+)\)[\s]*\{/Ux', $input_lines, $output_array);
+
+
+            echo Color::getColoredString("file : $file_name", "dark_gray", "blue") . "\n";
+
+
+            if (count($output_array[0]) !== 0) {
+
+                //echo "xhgxfgfgh : \n";
+                //print_r($output_array[1]);
+
+
+                print_r($output_array);
+
+                $pointer = 0;
+                foreach ($output_array[1] as $elem) {
+
+
+                    if (in_array($elem, $function_list)) {
+
+                        echo Color::getColoredString(" => function " . $elem . " : FOUND !", "black", "green") . "\n";
+                        echo Color::getColoredString("Etat du pointer : " . $pointer, "yellow", "black") . "\n";
+
+
+                        $list_arg = explode(",", $output_array[2][$pointer]);
+
+
+                        echo Color::getColoredString("Liste des arguments : ", "yellow", "black") . "\n";
+                        print_r($list_arg);
+                        $nb_arg = count($list_arg);
+                        if (!empty($func_list[$output_array[1][$pointer]][$nb_arg])) {
+
+
+                            echo Color::getColoredString("nombre d'arguments : " . $nb_arg, "black", "cyan") . "\n";
+
+
+                            //echo "fucnc ====>";
+                            //print_r($func_list[$output_array[1][$i]]);
+
+                            foreach ($func_list[$output_array[1][$pointer]][$nb_arg] as $offset => $val) {
+                                print_r($func_list[$output_array[1][$pointer]][$nb_arg]);
+
+                                if (substr(trim($list_arg[$offset]), 0, 1) == "&") {
+                                    continue;
+                                }
+
+                                $list_arg[$offset] = "&" . trim($list_arg[$offset]);
+                            }
+                            echo Color::getColoredString("argument(s) modifié(s) : ", "black", "cyan") . "\n";
+                            print_r($list_arg);
+
+                            $new_arg   = implode(",", $list_arg);
+                            $newstring = str_replace($output_array[2][$pointer], $new_arg, $output_array[0][$pointer]);
+
+
+
+                            echo Color::getColoredString($output_array[0][$pointer] . " ===> " . $newstring, "green", "black") . "\n";
+
+
+                            $input_lines = str_replace($output_array[0][$pointer], $newstring, $input_lines);
+
+                            echo Color::getColoredString("END OF TREATEMENT", "cyan", "black") . "\n";
+                            echo " \n";
+
+                            //preg_match("/\((.+)\)/U", $input_line, $output_array);
+                        } else {
+                            if (in_array($output_array[1][$pointer], $func_to_escape)) {
+                                continue;
+                            }
+
+
+                            echo Color::getColoredString("\nfile : " . $file_name, "white", "red") . "\n";
+
+                            print_r($list_arg);
+
+                            echo Color::getColoredString("function with number of arg not found : " . $output_array[1][$pointer], "white", "red") . "\n";
+                        }
+
+
+                        //exit;
+                    }
+
+
+
+
+                    $pointer++;
+                }
+            }
+
+
+            file_put_contents($file_name, $input_lines);
+        }
+    }
+
+    function replace_ereg()
+    {
+
+        /*
+         * 
+         * function LectureDesDonnees_FF5MIR($Ma_Requete_Sql,
+          $Mes_Parametres_Requete,
+          $MesColonnes,
+          $PAGE_LISTE ){
+         * 
+         * 
+         * AlimentationLignesSynthese ( $TamponLecture,$MesColonnes,&$PAGE_LISTE)
+         */
+        $this->view        = false;
+        $this->layout_name = false;
+
+        $files = $this->getFilesNames();
+
+        $out  = array();
+        $data = array();
+
+
+        echo "#####################################################################\n";
+        echo "Replace ereg => \" \n";
+        echo "#####################################################################\n";
+
+
+
+
+        foreach ($files as $file_name) {
+
+            //  echo $file_name."\n";
+            $input_lines = file_get_contents($file_name);
+            //echo $data;
+
+            preg_match_all('/ereg[\s]*\("(.+)",.*\).*;/Us', $input_lines, $output_array);
+
+            if (!empty($output_array[0])) {
+
+                $i = 0;
+                foreach ($output_array[1] as $args) {
+
+                   
+                    $new_arg = '/' . $args . '/';
+
+                    $new_string = str_replace("ereg", "preg_match", $output_array[0][$i]);
+                    $new_string = str_replace($args, $new_arg, $new_string);
+
+                    echo $args . " ===> " . $new_arg . "\n";
+
+                    $input_lines = str_replace($output_array[0][$i], $new_string, $input_lines);
+                    $i++;
+                }
+            }
+            file_put_contents($file_name, $input_lines);
+        }
+		
+
+		        echo "#####################################################################\n";
+        echo "Replace ereg => \$ \n";
+        echo "#####################################################################\n";
+		foreach ($files as $file_name) {
+
+            //  echo $file_name."\n";
+            $input_lines = file_get_contents($file_name);
+            //echo $data;
+
+            preg_match_all('/ereg[\s]*\((\$[\w]+),.*\).*;/Us', $input_lines, $output_array);
+
+            if (!empty($output_array[0])) {
+
+                $i = 0;
+                foreach ($output_array[1] as $args) {
+
+                   
+                    $new_arg = '"/".' . $args . '."/"';
+
+                    $new_string = str_replace("ereg", "preg_match", $output_array[0][$i]);
+                    $new_string = str_replace($args, $new_arg, $new_string);
+
+                    echo $args . " ===> " . $new_arg . "\n";
+
+                    $input_lines = str_replace($output_array[0][$i], $new_string, $input_lines);
+                    $i++;
+                }
+            }
+            file_put_contents($file_name, $input_lines);
+        }
+    }
+
 }
+
+// /home/www/adel/FF/FF5TNO3.php
