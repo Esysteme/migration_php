@@ -1552,7 +1552,7 @@ class requete
 		if ( \$this->TypeSql == "S" )
 		{
 			//echo \$this->SqlExec;
-                
+            list (\$msec, \$sec) = explode( ' ', microtime() );    
 			\$microtime_sql = ( float ) \$msec + ( float ) \$sec;
 			\$this->IdRes = ociparse( \$GLOBALS[\$this->Base_Appelee]["ID_CON"], \$this->SqlExec );
 			if ( !IsResultId( \$this->IdRes ) )
@@ -2382,135 +2382,44 @@ EOL;
 
             $data = file_get_contents($file_name);
 
-            preg_match_all("#([\w]*)[\s]*\((.+)\)[\s]*;#Us", $data, $out, PREG_PATTERN_ORDER);
 
+			preg_match_all('/\$?[\w]+\s*[\s*\["\w+"\]\s*]*\(([^)]*\&\$[^)]*)\);/U', $data, $out);
+			//preg_match_all("#\$?[\w]+\s*[\s*\["\w+\"\]\s*]*\(([^)]*\&\$[^)]*)\);#U", $data, $out, PREG_PATTERN_ORDER);
+            //preg_match_all('#([a-zA-Z_]{1}[a-zA-Z0-9_]*)\["\w+"\]?[ ]*\((.+)\)[ ]*;#U', $data, $out, PREG_PATTERN_ORDER);
 
-            $i = 0;
-            foreach ($out[2] as $params) {
-                //print_r($params);
-                $vars = explode(",", $params);
-                foreach ($vars as $var) {
-                    $var = trim($var);
-
-                    if (mb_substr($var, 0, 2) === "&$") {
-
-                        //print_r($out);
-                        //echo $out[1][$i] . " ( " . $var . " )\n";
-                        echo $file_name . ":" . $out[0][$i] . "\n";
-
-
-                        $string_to_replace = str_replace('&$', '$', $out[0][$i]);
-                        $data              = str_replace($out[0][$i], $string_to_replace, $data);
-
-
-
-                        $function_list[] = $out[1][$i];
-                    }
-                }
-
-                $i++;
-            }
-
-
-            preg_match_all('#([a-zA-Z_]{1}[a-zA-Z0-9_]*)\["\w+"\]?[ ]*\((.+)\)[ ]*;#U', $data, $out, PREG_PATTERN_ORDER);
-
+			echo Color::getColoredString( $file_name, "yellow") . "\n";
 
             $i = 0;
-            foreach ($out[2] as $params) {
-                //print_r($params);
-                $vars = explode(",", $params);
-                foreach ($vars as $var) {
-                    $var = trim($var);
+			
+			if (! empty($out[1]))
+			{
+				
+				foreach ($out[1] as $params) {
+				   
+					$vars = explode(",", $params);
+					foreach ($vars as $var) {
+						$var = trim($var);
 
-                    if (mb_substr($var, 0, 2) === "&$") {
+						if (mb_substr($var, 0, 2) === "&$") {
 
-                        //print_r($out);
-                        //echo $out[1][$i] . " ( " . $var . " )\n";
-                        echo $file_name . ":" . $out[0][$i] . "\n";
+							$string_to_replace = str_replace('&$', '$', $out[1][$i]);
+							$data2              = str_replace($out[1][$i], $string_to_replace, $out[0][$i]);
+							$data              = str_replace($out[0][$i], $data2, $data);
+							
+							echo Color::getColoredString( $out[0][$i], "red") . "\n";
+							echo Color::getColoredString( $data2, "green") . "\n";
+						}
+					}
 
-
-                        $string_to_replace = str_replace('&$', '$', $out[0][$i]);
-                        $data              = str_replace($out[0][$i], $string_to_replace, $data);
-
-
-
-                        $function_list[] = $out[1][$i];
-                    }
-                }
-
-                $i++;
-            }
-
+					$i++;
+				}
+			}
             file_put_contents($file_name, $data);
         }
 
-        $alpha = array_count_values($function_list);
-
-        print_r($alpha);
-
-        $function_list = array_unique($function_list);
-        print_r($function_list);
-
-        /*
-         *   
-
-          Array
-          (
-          [LectureUsersAdel] => 2
-          [FG_Afficher_Liste_V12] => 26
-          [odbc_fetch_into] => 14
-          [FF_Controle_Autorisation] => 283
-          [FG_Afficher_Liste_V13] => 5
-          [FG_Afficher_Liste_V16] => 47
-          [lecturedesdonnees] => 21
-          [LectureDesDonnees] => 94
-          [print_r] => 6
-          [Controle_critere_affichage] => 4
-          [gestion_lien_jalon_task] => 2
-          [Controle_PONDJAL] => 1
-          [recherche_wpo] => 20
-          [LectureDesDonnees_FF5MNP2] => 1
-          [gestion_libelle_cbs] => 1
-          [gestion_affichage_detail_npoh] => 6
-          [AlimentationLignesForecast] => 1
-          [GenerationLignesProjet] => 2
-          [InitialisationLigneProjetErreur] => 2
-          [LectureDonnees] => 15
-          [RAPPROCHEMENT_JALON] => 2
-          [LectureWORKPACKAGE] => 2
-          [LectureProjet] => 1
-          [LectureDesDonnees_FF5MIR] => 1
-          [LectureLigneCbs] => 2
-          [LectureCashout] => 2
-          [LectureVO] => 2
-          [AlimentationLignesSynthese] => 2
-          [LectureOpportunites] => 2
-          [Recup_liste_otp_FF2DDW] => 1
-          [ProtegerChamps] => 3
-          [CommpleterLigneWorkpackage] => 1
-          [FF5RWP_genere_requete_DEP] => 3
-          [FF5RWP_genere_requete_ECO] => 3
-          [FF5RWP_genere_requete_HCO] => 2
-          [FF5RWP_Genere_requete_RISKSAVING] => 2
-          [alimentationlignessyntheseProjet] => 1
-          [LectureArborescenteResponsable] => 4
-          [LectureImputations] => 1
-          [Lecture_AVANCEMENT_PHYSIQUE] => 1
-          [lecturedesdonneesSAV] => 1
-          [LectureTransfert] => 2
-          [FG_Afficher_Liste_V15] => 8
-          [Controle_PCPOTASK] => 1
-          [AlimentationLignesComparatif] => 2
-          [LectureRevuesCDB] => 3
-          [lecturedesdonneesfiche] => 1
-          [Email_User] => 7
-          [lecture] => 6
-          [TestIURecursif] => 2
-          [generer_shape] => 1
-          )
 
 
-         */
+   
     }
 
     function replaceCtrlM()
@@ -2665,7 +2574,6 @@ EOL;
             file_put_contents($file_name, $input_lines);
         }
 
-		
         //function called
 		
         foreach ($files as $file_name) {
@@ -2720,9 +2628,10 @@ EOL;
 
 
 
+			
             //[ ]*[.{1}[\w]+.{1}]*
             //preg_match_all('#([a-zA-Z_]{1}[a-zA-Z0-9_]*)[ ]*\([^\)](.+)\)[ ]*;#Um', $data, $out, PREG_PATTERN_ORDER);
-            preg_match_all('/([\w]+)\(([^)]*\&\$[^)]*\));/U', $data, $out, PREG_PATTERN_ORDER);
+            preg_match_all('/([\w]+)\(([^)]*[&]{1}[$]{1}[^)]*\));/U', $data, $out, PREG_PATTERN_ORDER);
 
             $i = 0;
             foreach ($out[2] as $params) {
@@ -2935,7 +2844,7 @@ EOL;
         }
 		
 
-		        echo "#####################################################################\n";
+		echo "#####################################################################\n";
         echo "Replace ereg => \$ \n";
         echo "#####################################################################\n";
 		foreach ($files as $file_name) {
