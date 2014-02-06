@@ -67,7 +67,12 @@ class Migration extends Controller
         $this->replaceConst(); // replace $ggg[gg] by $ggg['gg']
         $this->replaceConst(); // replace $ggg[gg] by $ggg['gg']
         $this->replaceConst(); // replace $ggg[gg] by $ggg['gg']
-        //$this->checkConst(); // replace $ggg[gg] by $ggg['gg']
+		
+		
+        $this->replaceConst2(); // replace $ggg[gg] by $ggg['gg']
+        
+		
+		//$this->checkConst(); // replace $ggg[gg] by $ggg['gg']
 
 
         $this->putConst(); // replace realconstante $ggg[gg] by  $ggg['gg']
@@ -118,7 +123,35 @@ class Migration extends Controller
 
     function replaceConst()
     {
-        $this->view        = false;
+        /*
+			exemple to match
+			$liste_mat[$ColonnesLues["IDPERS"]["Valeur"]][Valeur1] 2 time
+			$liste_mat[$ColonnesLues["IDPERS"][Valeur2]][Valeur3] 1 time
+			
+			$ColonnesLues["IDPERS"]
+			[Valeur4] 1 time
+			$ColonnesLues[$gggg."IDPERS"][Valeur5] 1 time
+			$ColonnesLues[$gggg.'IDPERS'][Valeur6] 1 time
+			$TABLE_TEMP_FIX[$TabTemp["IDDEP"]["Valeur"]][Valeur7]
+			$_GET["name"] .'[NO_TAKE]  ============>
+			$TLibelles[$RUBRIQUES_AFFICHEES[$CodeRubrique]["TypeAffichage"]]
+			[Valeur8]
+			$TLibelles[$CodeRubrique.trim($Code)][Valeur8]
+			$TLibelles["INSPR"]["DomaineDeValeurs"]
+            [$PAGE_LISTE[$i][Valeur9]
+			$PAGE_FICHE["DTDERONPOH"],
+            str_replace( "[NO_TAKE]
+			$liste_mat[$ColonnesLues["IDPERS"][Valeur10]]["Valeur3"] 1 time
+			$PAGE_FICHE[ Valeur11  ]
+			$_GET["name"] .'[NO_TAKE]
+			{$tab["CDAPPLI"]["Valeur"]}/{$tab["CDPAGE"]["Valeur"]}.php?URL[NO_TAKE] 
+
+			
+			/home/www/adel/include/IC_Liste_HTML.inc.V8.php:@$RUBRIQUES_AFFICHEES[$Rubrique][TraitementSpecifiqueCellule] => @$RUBRIQUES_AFFICHEES[$Rubrique]["TraitementSpecifiqueCellule"]
+			 /home/www/adel/include/IC_Liste_HTML.inc.V13.1.CIE7.php:@$RUBRIQUES_AFFICHEES[$Rubrique][TraitementSpecifiqueCellule] => @$RUBRIQUES_AFFICHEES[$Rubrique]["TraitementSpecifiqueCellule"]
+			 /home/www/adel/FD/FDHCIMPU6.php: $TabTemp["MTDACT"]["Valeur"] + $TabTemp["MTOACT"]["Valeur"] + $TabTemp[IMP.MTSTCT][Valeur] =>  $TabTemp["MTDACT"]["Valeur"] + $TabTemp["MTOACT"]["Valeur"] + $TabTemp[IMP.MTSTCT]["Valeur"]
+		*/
+		$this->view        = false;
         $this->layout_name = false;
         $files             = $this->getFilesNames();
 
@@ -135,19 +168,99 @@ class Migration extends Controller
             // preg_match_all('#[^\\]\$[\w]+[\-\>[\w]+]?(\[([\[("\w+"|\$\w+)\]])*\])*\[([\w]+)\]#U', $buffer, $out, PREG_PATTERN_ORDER);
             //preg_match_all('/^[\s]*[\$]{1}[\w]+[\-\>[\w]+]?(\[([\[("\w+"|\$\w+)\]])*\])*\[([\w]+)\]/U', $buffer, $out, PREG_PATTERN_ORDER);
             // \$[\w]+[\-\>[\w]+]?\[[\["\w+"|\$\w+\]]*\]*\[[\w]+\]
+			
 
-            preg_match_all('/[^\\\\]\$[\w]+[\-\>[\w]+]?(\[([\[\'\w+\'|"\w+"|\$\w+\]])*\])*\[([\w]+)\]/U', $data, $out);
+            
+			//=> the last good one
+			//preg_match_all('/[^\\\\]\$[\w]+[\-\>[\w]+]?(\[([\[\'\w+\'|"\w+"|\$\w+\]])*\])*\[([\w]+)\]/U', $data, $out);
+            //preg_match_all('/[^\\\\]\$[\w]+[\-\>[\w]+]?(\[([\[\'\w+\'|"\w+"|\$\w+\]])*\][\s]*)*[\s]*\[([\w]+)\]/U', $data, $out); V2
+            
+			
+			preg_match_all('/[^\\\\]\$[\w]+[\s]*[\-\>[\s]*[\w]+]?[\s]*(\[([\[[\s]*\'\w+\'[\s]*|[\s]*"\w+"[\s]*|[\s]*\$\w+\s]*\]])*\][\s]*)*[\s]*\[([\s]*[\w]+[\s]*)\]/U', $data, $out);// V3
+			
+            //preg_match_all('/[^\\\\]\$[\w]+[\s]*[\-\>[\s]*[\w]+]?[\s]*(\[([\[[\s]*\'\w+\'[\s]*|[\s]*"\w+"[\s]*|[\s]*\$\w+\s*[\.\'[\w_-]+\']*]*\]])*\][\s]*)*[\s]*\[([\s]*[\w]+[\s]*)\]/U', $data, $out); =*> no work
+			
+			//preg_match_all('/[^\\\\]\$[\w]+[\s]*[\-\>[\s]*[\w]+]?[\s]*(\[([^\w])*\][\s]*)*[\s]*\[([\s]*[\w]+[\s]*)\]/U', $data, $out);
+			
+			
+			//preg_match_all('/[^\\\\]\$[\w]+[\s]*[\-\>[\s]*[\w]+]?\[[\s]*[^a-zA-Z_][^=<>;,]*[\s]*\]*[\s]*[\s]*\[([\s]*[\w]+[\s]*)\]/U', $data, $out);// V3
+			
+			
+			
+			
             $nb_to_replace = count($out[0]);
 
             for ($i = 0; $i < $nb_to_replace; $i++) {
 //echo "[".$out[2][$i]."] => ['".$out[2][$i]."']".PHP_EOL;
-                $new  = str_replace("[" . $out[3][$i] . "]", "[\"" . $out[3][$i] . "\"]", $out[0][$i]);
-                $data = str_replace($out[0][$i], $new, $data);
-                echo $file_name . ":" . $out[0][$i] . " => " . $new . PHP_EOL;
+                
+				//print_r($out);
+				
+				
+				
+				if (!empty(trim($out[0][$i]))) // we add \s+ so we need to prevent in case of [] to be replaced by [""] not the same value in php
+				{
+				
+					//$gg = preg_replace("/\s+/", "", );
+					
+					
+					
+					$new  = str_replace("[" . $out[3][$i] . "]", "[\"" . trim($out[3][$i]) . "\"]", $out[0][$i]);
+					$data = str_replace($out[0][$i], $new, $data);
+					echo $file_name . ":" . $out[0][$i] . " => " . $new . PHP_EOL;
+				}
             }
 
             file_put_contents($file_name, $data);
         }
+
+    }
+	
+	
+	function replaceConst2()
+    {
+
+		$this->view        = false;
+        $this->layout_name = false;
+        $files             = $this->getFilesNames();
+
+
+        $i = 0;
+        foreach ($files as $file_name) {
+
+            $data = "";
+
+            $data = file_get_contents($file_name);
+
+			preg_match_all('/[^\\\\]\$[\w]+[\s]*[\-\>[\s]*[\w]+]?\[[\s]*[^a-zA-Z_][^=<>;, \?\{\}]*[\s]*\]*[\s]*[\s]*\[([\s]*[\w]+[\s]*)\]/U', $data, $out);// V4
+			
+
+            $nb_to_replace = count($out[0]);
+
+            for ($i = 0; $i < $nb_to_replace; $i++) {
+				if (!empty(trim($out[0][$i]))) // we add \s+ so we need to prevent in case of [] to be replaced by [""] not the same value in php
+				{
+					$new  = str_replace("[" . $out[1][$i] . "]", "[\"" . trim($out[1][$i]) . "\"]", $out[0][$i]);
+					$data = str_replace($out[0][$i], $new, $data);
+					echo $file_name . ":" . $out[0][$i] . " => " . $new . PHP_EOL;
+				}
+            }
+
+            file_put_contents($file_name, $data);
+        }
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
     }
 
     function getDate()
