@@ -145,6 +145,8 @@ class Migration extends Controller
 			$PAGE_FICHE[ Valeur11  ]
 			$_GET["name"] .'[NO_TAKE]
 			{$tab["CDAPPLI"]["Valeur"]}/{$tab["CDPAGE"]["Valeur"]}.php?URL[NO_TAKE] 
+			
+			$EXPORT="./FF5FIA1_IMPORT.php?".SID."&PAGE_PARAMETRES[CDCDB]=".$PAGE_PARAMETRES["CDCDB"]."&PAGE_PARAMETRES[NO_TAKE]=".$PAGE["CDLANG"]."&PAGE_PARAMETRES[NO_TAKE]=".$PAGE_PARAMETRES["DTMOIS_ARRETE"]."&PAGE_PARAMETRES[NO_TAKE]=".$PAGE_PARAMETRES["DTMOIS_ARRETE_YYYYMM"];
 
 			
 			/home/www/adel/include/IC_Liste_HTML.inc.V8.php:@$RUBRIQUES_AFFICHEES[$Rubrique][TraitementSpecifiqueCellule] => @$RUBRIQUES_AFFICHEES[$Rubrique]["TraitementSpecifiqueCellule"]
@@ -163,47 +165,29 @@ class Migration extends Controller
 
             $data = file_get_contents($file_name);
 
-
             // preg_match_all('#[^\\]\$[a-zA-Z_]{1}[a-zA-Z0-9_]*[\-\>[\w]+]?(\[([\[("\w+"|\$\w+)\]])*\])*\[([a-zA-Z_]{1}[a-zA-Z0-9_]*)\]#U', $buffer, $out, PREG_PATTERN_ORDER);
             // preg_match_all('#[^\\]\$[\w]+[\-\>[\w]+]?(\[([\[("\w+"|\$\w+)\]])*\])*\[([\w]+)\]#U', $buffer, $out, PREG_PATTERN_ORDER);
             //preg_match_all('/^[\s]*[\$]{1}[\w]+[\-\>[\w]+]?(\[([\[("\w+"|\$\w+)\]])*\])*\[([\w]+)\]/U', $buffer, $out, PREG_PATTERN_ORDER);
             // \$[\w]+[\-\>[\w]+]?\[[\["\w+"|\$\w+\]]*\]*\[[\w]+\]
-			
-
             
 			//=> the last good one
 			//preg_match_all('/[^\\\\]\$[\w]+[\-\>[\w]+]?(\[([\[\'\w+\'|"\w+"|\$\w+\]])*\])*\[([\w]+)\]/U', $data, $out);
             //preg_match_all('/[^\\\\]\$[\w]+[\-\>[\w]+]?(\[([\[\'\w+\'|"\w+"|\$\w+\]])*\][\s]*)*[\s]*\[([\w]+)\]/U', $data, $out); V2
             
-			
 			preg_match_all('/[^\\\\]\$[\w]+[\s]*[\-\>[\s]*[\w]+]?[\s]*(\[([\[[\s]*\'\w+\'[\s]*|[\s]*"\w+"[\s]*|[\s]*\$\w+\s]*\]])*\][\s]*)*[\s]*\[([\s]*[\w]+[\s]*)\]/U', $data, $out);// V3
 			
             //preg_match_all('/[^\\\\]\$[\w]+[\s]*[\-\>[\s]*[\w]+]?[\s]*(\[([\[[\s]*\'\w+\'[\s]*|[\s]*"\w+"[\s]*|[\s]*\$\w+\s*[\.\'[\w_-]+\']*]*\]])*\][\s]*)*[\s]*\[([\s]*[\w]+[\s]*)\]/U', $data, $out); =*> no work
-			
 			//preg_match_all('/[^\\\\]\$[\w]+[\s]*[\-\>[\s]*[\w]+]?[\s]*(\[([^\w])*\][\s]*)*[\s]*\[([\s]*[\w]+[\s]*)\]/U', $data, $out);
-			
-			
 			//preg_match_all('/[^\\\\]\$[\w]+[\s]*[\-\>[\s]*[\w]+]?\[[\s]*[^a-zA-Z_][^=<>;,]*[\s]*\]*[\s]*[\s]*\[([\s]*[\w]+[\s]*)\]/U', $data, $out);// V3
-			
-			
-			
 			
             $nb_to_replace = count($out[0]);
 
             for ($i = 0; $i < $nb_to_replace; $i++) {
-//echo "[".$out[2][$i]."] => ['".$out[2][$i]."']".PHP_EOL;
-                
-				//print_r($out);
-				
-				
+
 				
 				if (!empty(trim($out[0][$i]))) // we add \s+ so we need to prevent in case of [] to be replaced by [""] not the same value in php
 				{
-				
-					//$gg = preg_replace("/\s+/", "", );
-					
-					
-					
+
 					$new  = str_replace("[" . $out[3][$i] . "]", "[\"" . trim($out[3][$i]) . "\"]", $out[0][$i]);
 					$data = str_replace($out[0][$i], $new, $data);
 					echo $file_name . ":" . $out[0][$i] . " => " . $new . PHP_EOL;
@@ -231,7 +215,7 @@ class Migration extends Controller
 
             $data = file_get_contents($file_name);
 
-			preg_match_all('/[^\\\\]\$[\w]+[\s]*[\-\>[\s]*[\w]+]?\[[\s]*[^a-zA-Z_][^=<>;, \?\{\}]*[\s]*\]*[\s]*[\s]*\[([\s]*[\w]+[\s]*)\]/U', $data, $out);// V4
+			preg_match_all('/[^\\\\]\$[\w]+[\s]*[\-\>[\s]*[\w]+]?\[[\s]*[^a-zA-Z_][^=<>;, \?\{\}\&]*[\s]*\]*[\s]*[\s]*\[([\s]*[\w]+[\s]*)\]/U', $data, $out);// V4
 			
 
             $nb_to_replace = count($out[0]);
@@ -247,17 +231,6 @@ class Migration extends Controller
 
             file_put_contents($file_name, $data);
         }
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
 		
 		
 		
@@ -2038,6 +2011,8 @@ function IsConnectId( \$IdConnexion )
 //------------------------------------------------------------------------------
 function ConnectBase( &\$IdConnect, \$base )
 {
+	global \$IC_TNSNAME; 
+	
 	\$numargs = func_num_args();
 	if ( \$numargs < 2 )
 		return false;  // aucun paramÃ¨tre.
@@ -2058,16 +2033,9 @@ function ConnectBase( &\$IdConnect, \$base )
 
                 
                 // =>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> this connect is used for ADEL
-		\$MaCon = ocinlogon( "PHP", "JGMWEB", "(DESCRIPTION =
-    (ADDRESS_LIST =
-      (ADDRESS = (PROTOCOL = TCP)(Host = SBCCH10186.ad.sys)(Port = 1523))
-    )
-    (CONNECT_DATA =
-      (SID = ADELPREP)
-    )
-  )" ) or die( "pb connection" );
+		\$MaCon = ocinlogon( "PHP", "JGMWEB", \$IC_TNSNAME ) or die( "pb connection" );
 //           \$MaCon = ocinlogon("DBASIF","DBASIF","ADELPROD");
-		/*          if (! \$MaCon = @ocinlogon("DBASIF","DBASIF","ADELPROD")) {
+		/*          if (! \$MaCon = ocinlogon("DBASIF","DBASIF","ADELPROD")) {
 		  \$error = ocierror();
 		  print_r(\$error);
 		  echo "There was an error connecting. Error was: ".\$error["message"];
