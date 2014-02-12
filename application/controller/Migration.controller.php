@@ -76,7 +76,7 @@ class Migration extends Controller
 
 
         $this->putConst(); // replace realconstante $ggg[gg] by  $ggg['gg']
-        $this->addConfigFile(); // add /include/IC_ENVIRONNEMENT.php
+        //$this->addConfigFile(); // add /include/IC_ENVIRONNEMENT.php
         $this->addFullPath(); // repalce include file.php by include __DIR__."file.php"
         //$this->addTimeZoneToFfFF0PAG1(); // add default time zone
         //deprecated
@@ -2035,13 +2035,10 @@ function ConnectBase( &\$IdConnect, \$base )
                 // =>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> this connect is used for ADEL
 		\$MaCon = ocinlogon( "PHP", "JGMWEB", \$IC_TNSNAME ) or die( "pb connection" );
 //           \$MaCon = ocinlogon("DBASIF","DBASIF","ADELPROD");
-		/*          if (! \$MaCon = ocinlogon("DBASIF","DBASIF","ADELPROD")) {
-		  \$error = ocierror();
-		  print_r(\$error);
-		  echo "There was an error connecting. Error was: ".\$error["message"];
-		  phpinfo();
-		  die();
-		  } */
+
+
+	\$gg = ociparse(\$MaCon,"alter session set nls_date_format='yyyy-mm-dd hh24:mi:ss'");
+	ociexecute(\$gg);
 
 
 // echo "**** Macon". \$MaCon;
